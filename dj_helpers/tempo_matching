@@ -1,0 +1,26 @@
+# currently: not used?
+import librosa
+import sounddevice as sd
+import numpy as np
+
+def play_tempo_matched(path, target_bpm):
+    """
+    Loads a song, estimates its BPM, time-stretches it to match target_bpm,
+    and plays it in real time.
+    """
+    y, sr = librosa.load(path, mono=True)
+    orig_bpm, _ = librosa.beat.beat_track(y=y, sr=sr)
+    factor = target_bpm / max(1e-6, orig_bpm)
+
+    print(f"🎵 Original BPM: {orig_bpm:.1f} → Target BPM: {target_bpm:.1f}")
+    print(f"⏩ Applying time-stretch factor {factor:.3f}")
+
+    y_stretch = librosa.effects.time_stretch(y, rate=factor)
+    sd.play(y_stretch, sr)
+    sd.wait()
+
+if __name__ == "__main__":
+    import sys
+    path = sys.argv[1]
+    bpm = float(sys.argv[2])
+    play_tempo_matched(path, target_bpm=bpm)
