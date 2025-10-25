@@ -1,0 +1,11 @@
+{
+  "bpm": 117,
+  "key": "E major",
+  "duration": 202.62,
+  "stems": {
+    "vocals": "data\\htdemucs\\Dynamite\\vocals.mp3",
+    "drums": "data\\htdemucs\\Dynamite\\drums.mp3",
+    "bass": "data\\htdemucs\\Dynamite\\bass.mp3",
+    "other": "data\\htdemucs\\Dynamite\\other.mp3"
+  }
+}

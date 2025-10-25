@@ -1,0 +1,11 @@
+{
+  "bpm": 117,
+  "key": "G minor",
+  "duration": 222.45,
+  "stems": {
+    "vocals": "data\\htdemucs\\DJGotUsFallinInLove\\vocals.mp3",
+    "drums": "data\\htdemucs\\DJGotUsFallinInLove\\drums.mp3",
+    "bass": "data\\htdemucs\\DJGotUsFallinInLove\\bass.mp3",
+    "other": "data\\htdemucs\\DJGotUsFallinInLove\\other.mp3"
+  }
+}
