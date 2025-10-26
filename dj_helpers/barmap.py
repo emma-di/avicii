@@ -1,5 +1,5 @@
 # barmap.py
-# python -m calibrate.barmap data/mp3s/Dynamite.mp3
+# python -m dj_helpers.barmap data/mp3s/Dynamite.mp3
 
 import json
 import os

@@ -7,7 +7,7 @@
 #   python -m dj_helpers.crossfade_stems data/mp3s/Song1.mp3 data/mp3s/Song2.mp3
 #
 # Custom transition points for each stem:
-#   python -m dj_helpers.crossfade_stems Song1.mp3 Song2.mp3 `
+#   python -m dj_helpers.crossfade_stems CallMeMaybe.mp3 DJGotUsFallinInLove.mp3 `
 #     --bass-transition 0.5 `
 #     --drums-transition 0.4 `
 #     --vocals-transition 0.7 `
