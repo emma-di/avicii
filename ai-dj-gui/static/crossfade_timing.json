@@ -1,0 +1,26 @@
+{
+  "mixes": {
+    "DJGotUsFallinInLove_HotelRoomService_mix.wav": {
+      "track1": "DJ Got Us Fallin' In Love",
+      "track2": "Hotel Room Service",
+      "fade_start": 106,
+      "fade_end": 128,
+      "total_duration": 334.0,
+      "notes": "Crossfade from 1:46 to 2:08"
+    },
+    
+    "complete_dj_set.wav": {
+      "track1": "Party Mix",
+      "track2": "4 Song Set",
+      "fade_start": 60,
+      "fade_end": 90,
+      "total_duration": 300.0,
+      "notes": "Estimated 5 min party mix - UPDATE THESE TIMES after listening!"
+    }
+  },
+  
+  "default": {
+    "fade_duration_ratio": 0.15,
+    "note": "If mix not found, uses 15% crossfade in middle"
+  }
+}

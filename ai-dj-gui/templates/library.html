@@ -5,6 +5,191 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI DJ - Library</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, rgba(30, 30, 50, 0.95), rgba(20, 20, 35, 0.95));
+            border: 2px solid rgba(168, 85, 247, 0.3);
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(168, 85, 247, 0.3);
+            animation: slideUp 0.4s ease;
+            position: relative;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid rgba(168, 85, 247, 0.3);
+        }
+        
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: aqua;
+            text-shadow: 0 0 10px rgba(127, 255, 212, 0.5);
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: rotate(90deg);
+        }
+        
+        .song-detail-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 24px 0;
+        }
+        
+        .song-detail-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--accent-cyan);
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .song-detail-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(8px);
+        }
+        
+        .song-detail-number {
+            color: var(--accent-purple);
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-right: 8px;
+        }
+        
+        .song-detail-name {
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        
+        .song-detail-artist {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            padding-top: 16px;
+            border-top: 2px solid rgba(168, 85, 247, 0.3);
+        }
+        
+        .add-songs-btn {
+            padding: 14px 32px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .add-songs-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(168, 85, 247, 0.5);
+        }
+        
+        .add-songs-btn:active {
+            transform: translateY(0);
+        }
+        
+        .add-songs-btn .plus-icon {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        
+        .info-icon {
+            display: inline-block;
+            margin-left: 12px;
+            width: 24px;
+            height: 24px;
+            background: rgba(127, 255, 212, 0.2);
+            border: 2px solid aqua;
+            border-radius: 50%;
+            color: aqua;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .info-icon:hover {
+            background: aqua;
+            color: #000;
+            transform: scale(1.2);
+        }
+    </style>
 </head>
 <body>
     <!-- Home button with headphone icon -->
@@ -47,53 +232,151 @@
                 <div class="playlist-header">Your Playlists</div>
                 
                 <ul class="song-list" id="playlist-list">
-                    {% if playlists %}
-                        {% for playlist in playlists %}
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="{{ playlist.name }}">
-                            <div class="song-title">{{ loop.index }}. {{ playlist.name }}</div>
-                            <div class="song-meta">
-                                <span>{{ playlist.song_count }} songs</span>
-                                <span>{{ playlist.duration }} min</span>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    {% else %}
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Summer Vibes Mix">
-                            <div class="song-title">1. Summer Vibes Mix</div>
-                            <div class="song-meta"><span>5 songs</span><span>18 min</span></div>
-                        </li>
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Workout Playlist">
-                            <div class="song-title">2. Workout Playlist</div>
-                            <div class="song-meta"><span>8 songs</span><span>32 min</span></div>
-                        </li>
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Chill Evening">
-                            <div class="song-title">3. Chill Evening</div>
-                            <div class="song-meta"><span>6 songs</span><span>24 min</span></div>
-                        </li>
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Night Drive">
-                            <div class="song-title">4. Night Drive</div>
-                            <div class="song-meta"><span>10 songs</span><span>42 min</span></div>
-                        </li>
-                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Party Mix">
-                            <div class="song-title">5. Party Mix</div>
-                            <div class="song-meta"><span>12 songs</span><span>48 min</span></div>
-                        </li>
-                    {% endif %}
+                    <!-- Real playlist that exists -->
+                    <li class="song-item selected"
+                        onclick="selectPlaylist(this)"
+                        data-playlist="Party Mix"
+                        data-file="complete_dj_set.wav">
+                        <div class="song-title">
+                            1. 🎉 Party Mix
+                            <span class="info-icon" onclick="event.stopPropagation(); showSongDetails('Party Mix')">i</span>
+                        </div>
+                        <div class="song-meta">
+                            <span>4 songs</span>
+                            <span>~5 min</span>
+                        </div>
+                    </li>
+                    
+                    <!-- Demo playlists (for show) -->
+                    <li class="song-item disabled" style="opacity: 0.5; cursor: not-allowed;">
+                        <div class="song-title">2. Summer Vibes Mix</div>
+                        <div class="song-meta">
+                            <span>5 songs</span>
+                            <span>18 min</span>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Coming Soon</span>
+                        </div>
+                    </li>
+                    
+                    <li class="song-item disabled" style="opacity: 0.5; cursor: not-allowed;">
+                        <div class="song-title">3. Workout Playlist</div>
+                        <div class="song-meta">
+                            <span>8 songs</span>
+                            <span>32 min</span>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Coming Soon</span>
+                        </div>
+                    </li>
+                    
+                    <li class="song-item disabled" style="opacity: 0.5; cursor: not-allowed;">
+                        <div class="song-title">4. Chill Evening</div>
+                        <div class="song-meta">
+                            <span>6 songs</span>
+                            <span>24 min</span>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">Coming Soon</span>
+                        </div>
+                    </li>
                 </ul>
             </div>
         </div>
     </div>
     
+    <!-- Modal for song details -->
+    <div class="modal-overlay" id="songModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Party Mix</h2>
+                <button class="close-btn" onclick="closeSongDetails()">×</button>
+            </div>
+            <ul class="song-detail-list" id="songDetailList">
+                <!-- Will be populated by JavaScript -->
+            </ul>
+            <div class="modal-actions">
+                <button class="add-songs-btn" onclick="handleAddSongs()">
+                    <span class="plus-icon">+</span>
+                    <span>Add Songs</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <script>
-        let selectedPlaylist = null;
+        let selectedPlaylist = 'Party Mix';
+        let selectedFile = 'complete_dj_set.wav';
+        
+        // Song data for each playlist
+        const playlistSongs = {
+            'Party Mix': [
+                { number: 1, name: 'Dynamite', artist: 'Taio Cruz' },
+                { number: 2, name: 'DJ Got Us Fallin In Love Again', artist: 'USHER Ft. Pitbull' },
+                { number: 3, name: 'Summer', artist: 'Calvin Harris' },
+                { number: 4, name: 'Hotel Room Service', artist: 'Pitbull' }
+            ]
+        };
         
         function selectPlaylist(element) {
+            // Don't select disabled items
+            if (element.classList.contains('disabled')) {
+                return;
+            }
+            
             document.querySelectorAll('.song-item').forEach(item => {
                 item.classList.remove('selected');
             });
             element.classList.add('selected');
-            selectedPlaylist = element.dataset.playlist || element.querySelector('.song-title').textContent.split('. ')[1];
+            
+            selectedPlaylist = element.dataset.playlist;
+            selectedFile = element.dataset.file;
         }
+        
+        function showSongDetails(playlistName) {
+            const modal = document.getElementById('songModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const songList = document.getElementById('songDetailList');
+            
+            modalTitle.textContent = playlistName;
+            
+            // Get songs for this playlist
+            const songs = playlistSongs[playlistName] || [];
+            
+            // Build the song list HTML
+            songList.innerHTML = songs.map(song => `
+                <li class="song-detail-item">
+                    <div>
+                        <span class="song-detail-number">${song.number}.</span>
+                        <span class="song-detail-name">${song.name}</span>
+                    </div>
+                    <div class="song-detail-artist">${song.artist}</div>
+                </li>
+            `).join('');
+            
+            // Show modal
+            modal.classList.add('active');
+        }
+        
+        function closeSongDetails() {
+            const modal = document.getElementById('songModal');
+            modal.classList.remove('active');
+        }
+        
+        function handleAddSongs() {
+            // Future feature - for now just show a nice message
+            alert('Add Songs feature coming soon! 🎵');
+            // In the future, this would navigate to song selection page
+            // window.location.href = '/add-songs?playlist=' + encodeURIComponent(selectedPlaylist);
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('songModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSongDetails();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSongDetails();
+            }
+        });
         
         function startPlaylist() {
             if (!selectedPlaylist) {
@@ -101,17 +384,8 @@
                 return;
             }
             
-            // Send playlist to backend for auto-mixing
-            fetch('/api/start-playlist', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({playlist: selectedPlaylist, mode: 'auto'})
-            }).then(() => {
-                window.location.href = '/loading';
-            }).catch(err => {
-                console.error('Error starting playlist:', err);
-                window.location.href = '/loading';
-            });
+            // Go to loading page with party-mix mode (uses premade file)
+            window.location.href = '/loading?mode=party-mix&playlist=' + encodeURIComponent(selectedPlaylist);
         }
     </script>
 </body>

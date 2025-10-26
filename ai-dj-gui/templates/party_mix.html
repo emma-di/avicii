@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI DJ — Party Mix (Continuous)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    :root{
+      --ring-size: 340px;
+
+      /* Live-updated by JS (Web Audio) */
+      --pulse-scale: 1;          /* 1.00 .. ~1.03 */
+      --pulse-glow: 0;           /* 0 .. 1 */
+      --stereo-pan: 0px;         /* -8px .. +8px */
+    }
+
+    .header .home-btn img{
+      width:60px;height:60px;cursor:pointer;
+      filter:drop-shadow(0 4px 8px rgba(0,0,0,.3));
+      transition:transform .3s ease;
+    }
+    .header .home-btn img:hover{ transform:scale(1.1) rotate(5deg); }
+
+    .screen{
+      max-width:1400px; margin:0 auto;
+      display:flex; flex-direction:column; align-items:center;
+      padding: 0 40px;
+    }
+
+    .title{
+      margin:18px 0 12px;
+      font-size:2.4rem;
+      font-weight: 700;
+      font-family: var(--font-title);
+      letter-spacing:2px; color:aqua;
+      text-shadow:0 0 10px rgba(255,255,255,.15);
+    }
+
+    .main-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 60px;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .vinyl-section {
+      flex-shrink: 0;
+    }
+
+    .vinyl-wrap{
+      position:relative;
+      width:var(--ring-size);
+      height:var(--ring-size);
+      display:grid; place-items:center;
+    }
+
+    /* pulse + wobble wrappers (so spin stays clean) */
+    .vinyl-outer{
+      position:absolute; inset:0;
+      display:grid; place-items:center;
+      transform: translateX(var(--stereo-pan));
+      transition: transform .06s linear; /* super snappy stereo sway */
+    }
+    .vinyl-pulse{
+      position:absolute; inset:0;
+      display:grid; place-items:center;
+      transform: scale(var(--pulse-scale));
+      /* base shadow + reactive glow (second drop-shadow strength scales with --pulse-glow) */
+      filter:
+        drop-shadow(0 12px 30px rgba(0,0,0,.35))
+        drop-shadow(0 0 calc(6px + 18px * var(--pulse-glow)) rgba(168,85,247, .55));
+      transition: filter .08s linear;
+    }
+
+    /* Spinning vinyl */
+    .vinyl{
+      position:absolute; inset:0; display:grid; place-items:center;
+      animation:spin 6s linear infinite;
+    }
+    .vinyl img{
+      width:100%; height:100%;
+      object-fit:contain; opacity:.9; pointer-events:none;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg);} }
+
+    /* Orbiting node (continuous) */
+    .node-orbit{
+      position:absolute; inset:0;
+      animation:spin 6s linear infinite;
+      pointer-events:none;
+    }
+    .node{
+      position:absolute; left:50%; top:0%;
+      transform:translate(-50%,-50%);
+      width:16px;height:16px;border-radius:50%;
+      background:var(--accent-cyan);
+      /* base glow */
+      box-shadow:
+        0 0 8px rgba(34,211,238,.9),
+        0 0 18px rgba(34,211,238,.6),
+        0 0 30px rgba(34,211,238,.35);
+      /* add a tiny pulse too */
+      animation: nodePulse 1.2s ease-in-out infinite;
+    }
+    .node::after{
+      content:""; position:absolute; inset:-10px; border-radius:50%;
+      background:radial-gradient(circle,
+        rgba(34,211,238,.25) 0%,
+        rgba(34,211,238,0) 65%);
+      filter:blur(2px);
+    }
+    @keyframes nodePulse{ 0%{opacity:.35;} 50%{opacity:1;} 100%{opacity:.35;} }
+
+    /* Center play/pause */
+    .center-btn{ position:absolute; inset:0; display:grid; place-items:center; }
+    .pp{
+      width:84px;height:84px;border:none;border-radius:50%;cursor:pointer;color:#fff;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.12), rgba(255,255,255,.02)),
+                  linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      box-shadow:0 10px 26px rgba(168,85,247,.35);
+      font-size:2rem; line-height:0;
+      transition:transform .15s ease, box-shadow .2s ease;
+    }
+    .pp:hover{
+      transform:scale(1.05);
+      box-shadow:0 14px 36px rgba(168,85,247,.55);
+    }
+
+    /* Now Playing Section */
+    .now-playing-section {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(34, 211, 238, 0.1));
+      border: 2px solid rgba(168, 85, 247, 0.3);
+      border-radius: 20px;
+      padding: 32px 28px;
+      min-width: 320px;
+      max-width: 380px;
+      box-shadow: 0 10px 40px rgba(168, 85, 247, 0.2);
+    }
+
+    .now-playing-header {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 600;
+    }
+
+    .current-song {
+      margin-bottom: 32px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      border-left: 4px solid var(--accent-cyan);
+    }
+
+    .current-song-title {
+      font-size: 1.5rem;
+      color: aqua;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .current-song-artist {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .queue-header {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .queue-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .queue-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      border-left: 2px solid rgba(168, 85, 247, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .queue-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateX(4px);
+    }
+
+    .queue-item-title {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .queue-item-artist {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* Time (only current time) */
+    .time{
+      margin-top:18px;
+      color:var(--text-muted);
+      font-family:var(--font-main);
+      font-size: 1.1rem;
+    }
+
+    /* Skip controls */
+    .controls{
+      display:flex; gap:14px;
+      align-items:center; justify-content:center;
+      margin-top:14px;
+    }
+    .skip{
+      width:56px; height:56px; border:none; border-radius:50%;
+      cursor:pointer; color:#fff;
+      background:rgba(255,255,255,.06);
+      box-shadow:0 8px 18px rgba(0,0,0,.25);
+      font-size:1.25rem;
+      transition:transform .15s ease, background .2s ease;
+    }
+    .skip:hover{
+      transform:translateY(-2px);
+      background:rgba(255,255,255,.12);
+    }
+
+    @media (max-width: 1024px) {
+      .main-content {
+        flex-direction: column;
+        gap: 40px;
+      }
+      
+      .now-playing-section {
+        width: 100%;
+        max-width: 500px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="home-btn" onclick="window.location.href='/'">
+      <img src="{{ url_for('static', filename='images/Headphone_Home.png') }}" alt="Home">
+    </div>
+  </div>
+
+  <div class="container screen">
+    <div class="title">Party Mix</div>
+
+    <div class="main-content">
+      <!-- Vinyl Section (Left) -->
+      <div class="vinyl-section">
+        <div class="vinyl-wrap" id="wrap">
+          <!-- wrappers: wobble -> pulse -> spin -->
+          <div class="vinyl-outer">
+            <div class="vinyl-pulse">
+              <div class="vinyl">
+                <img src="{{ url_for('static', filename='images/purple_disc.png') }}" alt="Vinyl Disc">
+              </div>
+            </div>
+          </div>
+
+          <!-- Orbiting cyan node -->
+          <div class="node-orbit"><div class="node"></div></div>
+
+          <div class="center-btn"><button class="pp" id="pp" aria-label="Play/Pause">▶</button></div>
+        </div>
+
+        <!-- Time display below vinyl -->
+        <div class="time"><span id="cur">0:00</span></div>
+
+        <div class="controls">
+          <button class="skip" id="rw" title="Back 10s">⏪</button>
+          <button class="skip" id="ff" title="Forward 10s">⏩</button>
+        </div>
+      </div>
+
+      <!-- Now Playing Section (Right) -->
+      <div class="now-playing-section">
+        <div class="now-playing-header">Now Playing</div>
+        
+        <div class="current-song">
+          <div class="current-song-title" id="currentTitle">Dynamite</div>
+          <div class="current-song-artist" id="currentArtist">Taio Cruz</div>
+        </div>
+
+        <div class="queue-header">Up Next</div>
+        <ul class="queue-list" id="queueList">
+          <li class="queue-item">
+            <div class="queue-item-title">DJ Got Us Fallin In Love</div>
+            <div class="queue-item-artist">USHER Ft. Pitbull</div>
+          </li>
+          <li class="queue-item">
+            <div class="queue-item-title">Summer</div>
+            <div class="queue-item-artist">Calvin Harris</div>
+          </li>
+          <li class="queue-item">
+            <div class="queue-item-title">Hotel Room Service</div>
+            <div class="queue-item-artist">Pitbull</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <audio id="partyAudio" preload="auto">
+      <source src="{{ url_for('static', filename='mp3s/complete_dj_set.wav') }}" type="audio/wav">
+    </audio>
+  </div>
+
+  <script>
+    const audio = document.getElementById('partyAudio');
+    const btn   = document.getElementById('pp');
+    const curT  = document.getElementById('cur');
+    const wrap  = document.getElementById('wrap');
+    const rwBtn = document.getElementById('rw');
+    const ffBtn = document.getElementById('ff');
+    const currentTitle = document.getElementById('currentTitle');
+    const currentArtist = document.getElementById('currentArtist');
+    const queueList = document.getElementById('queueList');
+
+    function fmt(s){ s=Math.floor(s||0);
+      const m=(s/60|0), ss=String(s%60).padStart(2,'0');
+      return `${m}:${ss}`; }
+
+    // Song timing data (in seconds)
+    const songs = [
+      { start: 0, end: 80, title: 'Dynamite', artist: 'BTS' },
+      { start: 80, end: 128, title: 'DJ', artist: 'SoFaygo' },
+      { start: 128, end: 176, title: 'Summer', artist: 'Calvin Harris' },
+      { start: 176, end: 999, title: 'Hotel Room', artist: 'Pitbull' }
+    ];
+
+    let currentSongIndex = 0;
+
+    function updateNowPlaying(currentTime) {
+      // Find which song we're currently in
+      for (let i = 0; i < songs.length; i++) {
+        if (currentTime >= songs[i].start && currentTime < songs[i].end) {
+          if (i !== currentSongIndex) {
+            currentSongIndex = i;
+            currentTitle.textContent = songs[i].title;
+            currentArtist.textContent = songs[i].artist;
+            
+            // Update queue (show remaining songs)
+            updateQueue(i);
+          }
+          break;
+        }
+      }
+    }
+
+    function updateQueue(currentIndex) {
+      const upcomingSongs = songs.slice(currentIndex + 1);
+      
+      if (upcomingSongs.length === 0) {
+        queueList.innerHTML = '<li class="queue-item"><div class="queue-item-title" style="color: var(--text-muted);">End of mix</div></li>';
+        return;
+      }
+      
+      queueList.innerHTML = upcomingSongs.map(song => `
+        <li class="queue-item">
+          <div class="queue-item-title">${song.title}</div>
+          <div class="queue-item-artist">${song.artist}</div>
+        </li>
+      `).join('');
+    }
+
+    /* -------- Web Audio: reactive pulse + stereo wobble -------- */
+    let audioCtx, src, splitter, analyserL, analyserR;
+    let bufL, bufR;
+
+    function setupAudioGraph(){
+      if (audioCtx) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx  = new Ctx();
+
+      src       = audioCtx.createMediaElementSource(audio);
+      splitter  = audioCtx.createChannelSplitter(2);
+      analyserL = audioCtx.createAnalyser();
+      analyserR = audioCtx.createAnalyser();
+
+      analyserL.fftSize = 2048;
+      analyserR.fftSize = 2048;
+      analyserL.smoothingTimeConstant = 0.85;
+      analyserR.smoothingTimeConstant = 0.85;
+
+      bufL = new Uint8Array(analyserL.frequencyBinCount);
+      bufR = new Uint8Array(analyserR.frequencyBinCount);
+
+      // wire it up
+      src.connect(splitter);
+      splitter.connect(analyserL, 0);
+      splitter.connect(analyserR, 1);
+      src.connect(audioCtx.destination);
+    }
+
+    function rms(u8){
+      // convert 0..255 -> -1..1, compute RMS
+      let sum=0, n=u8.length;
+      for (let i=0;i<n;i++){
+        const v = (u8[i]-128)/128;
+        sum += v*v;
+      }
+      return Math.sqrt(sum / n);
+    }
+
+    function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+
+    function tick(){
+      // Update time and now playing
+      if (!isNaN(audio.currentTime)) {
+        curT.textContent = fmt(audio.currentTime);
+        updateNowPlaying(audio.currentTime);
+      }
+
+      // reactive visuals
+      if (audioCtx && audioCtx.state !== 'closed'){
+        analyserL.getByteTimeDomainData(bufL);
+        analyserR.getByteTimeDomainData(bufR);
+
+        const rL = rms(bufL);
+        const rR = rms(bufR);
+        const r  = (rL + rR) / 2;         // overall loudness approx
+        const d  = rL - rR;                // stereo difference
+
+        // Map loudness to scale and glow
+        // typical RMS for music ~0.02..0.2; map to scale 1..1.03 and glow 0..1
+        const scale = 1 + clamp((r - 0.02) * 0.20, 0, 0.03);
+        const glow  = clamp((r - 0.01) * 8.0, 0, 1);
+
+        // Map stereo difference to small X pan (-8px..+8px)
+        const panPx = clamp(d * 120, -8, 8);
+
+        wrap.style.setProperty('--pulse-scale', scale.toFixed(4));
+        wrap.style.setProperty('--pulse-glow',  glow.toFixed(3));
+        wrap.style.setProperty('--stereo-pan',  panPx.toFixed(2) + 'px');
+      }
+
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // Play / Pause
+    btn.addEventListener('click', async ()=>{
+      if (audio.paused){
+        try{
+          setupAudioGraph();
+          if (audioCtx.state === 'suspended') await audioCtx.resume();
+          await audio.play();
+          btn.textContent='⏸';
+        }catch(e){ /* autoplay gate */ }
+      }else{
+        audio.pause(); btn.textContent='▶';
+      }
+    });
+
+    // Keep spin/node in sync with play state (remove if you want constant spin)
+    const spinners = ()=> wrap.querySelectorAll('.vinyl, .node-orbit');
+    audio.addEventListener('play',  ()=> {
+      setupAudioGraph();
+      spinners().forEach(el=> el.style.animationPlayState='running');
+    });
+    audio.addEventListener('pause', ()=> spinners().forEach(el=> el.style.animationPlayState='paused'));
+
+    // Skip controls (±10s)
+    const SKIP = 10;
+    rwBtn.addEventListener('click', ()=> audio.currentTime = Math.max(0, (audio.currentTime||0) - SKIP));
+    ffBtn.addEventListener('click', ()=> audio.currentTime = (audio.currentTime||0) + SKIP);
+
+    // Keyboard shortcuts: J/K/L => -10 / play-pause / +10
+    window.addEventListener('keydown', (e)=>{
+      if (e.key.toLowerCase() === 'j') rwBtn.click();
+      if (e.key.toLowerCase() === 'l') ffBtn.click();
+      if (e.key.toLowerCase() === 'k') btn.click();
+    });
+  </script>
+</body>
+</html>

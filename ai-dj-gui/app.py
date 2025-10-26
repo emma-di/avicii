@@ -462,6 +462,9 @@ def start_playlist():
         'playlist': playlist_name
     })
 
+@app.route('/party-mix')
+def party_mix():
+    return render_template('party_mix.html')
 
 if __name__ == '__main__':
     print("🎧 AI DJ Backend Starting...")

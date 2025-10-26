@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
+    <!-- Header with headphone logo (same as Library) -->
+    <div class="header">
+        <div class="home-btn" onclick="window.location.href='/'">
+        <img src="{{ url_for('static', filename='images/Headphone_Home.png') }}"
+            alt="Home"
+            style="width: 60px; height: 60px; cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); transition: transform 0.3s ease;"
+            onmouseover="this.style.transform='scale(1.1) rotate(5deg)'"
+            onmouseout="this.style.transform='scale(1)'">
+        </div>
+    </div>
+
     <div class="container home-screen">
         <h1 class="welcome-title">Welcome DJs</h1>
         
