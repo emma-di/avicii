@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Enhanced DJ Mix Creator
-- Variable song lengths based on vibe
-- STRONG, noticeable effects
-- Fade out at end
+PARTY DJ Mix Creator 🎉
+- Beat drops and bass boosts
+- Beat-synced transitions
+- Creative mixing techniques
+- OBVIOUS DJ manipulation
 
 Just run: python custom_mix.py
 """
@@ -21,32 +22,35 @@ songs = [
     "Summer"
 ]
 
-print("🎛️  ENHANCED DJ MIX CREATOR")
+print("🎉 PARTY DJ MIX CREATOR")
 print("=" * 80)
 print(f"Tracks: {len(songs)}")
 for i, song in enumerate(songs, 1):
     print(f"  {i}. {song}")
 print("=" * 80)
-print("\n✨ NEW Features:")
-print("  1. Vibe-based lengths (high energy=short, chill=long)")
-print("  2. STRONG effects (6 types, very noticeable!)")
-print("  3. Fade out at end")
+print("\n🔥 PARTY FEATURES:")
+print("  → Beat drops (remove bass, then DROP it back!)")
+print("  → Bass boosts (+6dB thump)")
+print("  → Stutters & scratches")
+print("  → Beat-synced transitions")
+print("  → EQ swaps (bass swap technique)")
+print("  → Channel muting effects")
 print("=" * 80)
 
 # =============================================================================
-# CREATE MIX - Recommended Settings
+# CREATE PARTY MIX
 # =============================================================================
 
 result = create_smart_dj_set(
     track_names=songs,
-    output_dir="enhanced_mix",
+    output_dir="party_mix",
     
     # VIBE-BASED LENGTHS
     exit_preference='vibe_based',  # Dynamic! (30s-150s based on energy)
     
-    # STRONG EFFECTS
-    add_effects=True,              # Turn effects on
-    effect_intensity=1.0,          # 0.5=subtle, 1.0=normal, 1.5=extreme
+    # PARTY EFFECTS - MAXIMUM
+    add_effects=True,              # Turn on ALL effects
+    effect_intensity=1.0,          # 0.5=subtle, 1.0=party, 1.5=EXTREME
     
     # AUTO-ORDERING
     auto_order=True,

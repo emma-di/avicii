@@ -1,0 +1,11 @@
+{
+  "bpm": 123,
+  "key": "F# minor",
+  "duration": 239.28,
+  "stems": {
+    "vocals": "data\\htdemucs\\HotelRoomService\\vocals.mp3",
+    "drums": "data\\htdemucs\\HotelRoomService\\drums.mp3",
+    "bass": "data\\htdemucs\\HotelRoomService\\bass.mp3",
+    "other": "data\\htdemucs\\HotelRoomService\\other.mp3"
+  }
+}
