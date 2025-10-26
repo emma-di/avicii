@@ -1,0 +1,40 @@
+{
+  "track_order": [
+    "Dynamite",
+    "DJGotUsFallinInLove",
+    "Summer",
+    "HotelRoomService"
+  ],
+  "sequencing_strategy": "auto",
+  "energy_curve": "wave",
+  "exit_preference": "balanced",
+  "transitions": [
+    {
+      "track_a": "Dynamite",
+      "track_b": "DJGotUsFallinInLove",
+      "output_file": "my_smart_dj_set\\mix_01_Dynamite_to_DJGotUsFallinInLove.wav",
+      "exit_time": 105.96514673988142,
+      "exit_reason": "Natural song evolution endpoint & Energy dip (level: 0.71) (4004 indicators)",
+      "compatibility": 59.223902224138996,
+      "duration": 324.4122902494331
+    },
+    {
+      "track_a": "DJGotUsFallinInLove",
+      "track_b": "Summer",
+      "output_file": "my_smart_dj_set\\mix_02_DJGotUsFallinInLove_to_Summer.wav",
+      "exit_time": 120.0077373103755,
+      "exit_reason": "Energy dip (level: 0.76) & Natural song evolution endpoint (5225 indicators)",
+      "compatibility": 51.230193449122424,
+      "duration": 335.56798185941045
+    },
+    {
+      "track_a": "Summer",
+      "track_b": "HotelRoomService",
+      "output_file": "my_smart_dj_set\\mix_03_Summer_to_HotelRoomService.wav",
+      "exit_time": 119.97913881876,
+      "exit_reason": "Natural song evolution endpoint & Energy dip (level: 0.73) (5222 indicators)",
+      "compatibility": 34.706693065675196,
+      "duration": 355.2618367346939
+    }
+  ]
+}

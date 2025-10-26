@@ -489,8 +489,8 @@ def main():
     parser.add_argument(
         "--out-path",
         "-o",
-        default="data/mixes/crossfade_mix.wav",
-        help="Output file path (default: data/mixes/crossfade_mix.wav)"
+        default=None,
+        help="Output file path (default: auto-generated as Song1_Song2.wav)"
     )
     parser.add_argument(
         "--sr",
@@ -500,6 +500,13 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Auto-generate output filename if not provided
+    if args.out_path is None:
+        song1_name = os.path.splitext(os.path.basename(args.track1))[0]
+        song2_name = os.path.splitext(os.path.basename(args.track2))[0]
+        args.out_path = f"data/mixes/{song1_name}_{song2_name}.wav"
+        print(f"💾 Auto-generated output name: {args.out_path}")
     
     # Create crossfader
     crossfader = DJCrossfader(sr=args.sr)
