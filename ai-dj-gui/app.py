@@ -3,7 +3,8 @@ Flask Backend API for AI DJ
 Handles song loading and crossfading
 """
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_file
+from werkzeug.utils import secure_filename
 import os
 import sys
 import json
@@ -25,11 +26,18 @@ app.secret_key = 'your-secret-key-here'  # Change this in production!
 MP3_DIR = "../data/mp3s"
 METADATA_DIR = "../data/metadata"
 OUTPUT_DIR = "../data/mixes"
+UPLOAD_FOLDER = MP3_DIR
+ALLOWED_EXTENSIONS = {'mp3', 'wav'}
 
 # Ensure directories exist
 os.makedirs(MP3_DIR, exist_ok=True)
 os.makedirs(METADATA_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def allowed_file(filename):
+    """Check if file has allowed extension"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.route('/')
@@ -151,7 +159,6 @@ def new_playlist():
 @app.route('/library')
 def library():
     """Playlist selection page (cyan vinyl)"""
-    # TODO: Load saved playlists from database or JSON
     playlists = [
         {'name': 'Summer Vibes Mix', 'song_count': 5, 'duration': 18},
         {'name': 'Workout Playlist', 'song_count': 8, 'duration': 32},
@@ -166,30 +173,14 @@ def loading():
     return render_template('loading.html')
 
 
-@app.route('/api/get-current-mix')
-def get_current_mix():
-    """Serve the current mix audio file"""
-    mix_path = session.get('current_mix_path')
-    
-    if not mix_path or not os.path.exists(mix_path):
-        print(f"❌ Mix file not found: {mix_path}")
-        return "Mix file not found", 404
-    
-    print(f"🎵 Serving mix: {mix_path}")
-    
-    # Serve the audio file
-    from flask import send_file
-    return send_file(
-        mix_path,
-        mimetype='audio/wav',
-        as_attachment=False,
-        download_name='current_mix.wav'
-    )
+@app.route('/party-mix')
+def party_mix():
+    return render_template('party_mix.html')
+
 
 @app.route('/remix')
 def remix():
-    """Live mixing interface (red page)"""
-    # Get current mix info from session
+    """Live mixing interface"""
     track1 = session.get('current_track_1', 'Track 1')
     track2 = session.get('current_track_2', 'Track 2')
     bpm = session.get('current_bpm', 128)
@@ -203,12 +194,142 @@ def remix():
                          next_track='Loading...')
 
 
+@app.route('/api/upload-and-mix', methods=['POST'])
+def upload_and_mix():
+    """
+    Handle mixed uploads and library songs
+    
+    Can receive:
+    - file1 + file2 (both uploaded)
+    - file1 + file2_path (one uploaded, one from library)
+    - file1_path + file2 (one from library, one uploaded)
+    """
+    
+    track1_path = None
+    track2_path = None
+    track1_name = None
+    track2_name = None
+    
+    try:
+        # Process track 1
+        if 'file1' in request.files and request.files['file1'].filename:
+            # Track 1 is uploaded
+            file1 = request.files['file1']
+            
+            if not allowed_file(file1.filename):
+                return jsonify({'success': False, 'error': 'Invalid file type for track 1'}), 400
+            
+            # Clean filename - remove spaces and special chars, keep only alphanumeric, dash, underscore
+            filename1 = secure_filename(file1.filename)
+            # Further clean: remove spaces and special characters
+            name_part, ext = os.path.splitext(filename1)
+            clean_name = ''.join(c for c in name_part if c.isalnum() or c in '-_')
+            clean_name = clean_name.replace(' ', '_')
+            filename1 = f"{clean_name}{ext}"
+            
+            track1_path = os.path.abspath(os.path.join(UPLOAD_FOLDER, filename1))
+            file1.save(track1_path)
+            track1_name = os.path.splitext(filename1)[0]
+            
+            print(f"✅ Uploaded track 1: {filename1}")
+            print(f"   Path: {track1_path}")
+            
+            # Run calibration
+            try:
+                subprocess.run([
+                    'python', '-m', 'calibrate.calibrate_simple',
+                    track1_path,
+                    '--no-stems'
+                ], capture_output=True, text=True, check=True, timeout=60)
+                print(f"✅ Calibrated track 1")
+            except Exception as e:
+                print(f"⚠️  Calibration warning for track 1: {e}")
+        
+        elif 'file1_path' in request.form:
+            # Track 1 is from library
+            track1_path = request.form['file1_path']
+            track1_name = os.path.splitext(os.path.basename(track1_path))[0]
+            print(f"✅ Using library track 1: {track1_name}")
+        
+        else:
+            return jsonify({'success': False, 'error': 'No track 1 provided'}), 400
+        
+        # Process track 2
+        if 'file2' in request.files and request.files['file2'].filename:
+            # Track 2 is uploaded
+            file2 = request.files['file2']
+            
+            if not allowed_file(file2.filename):
+                return jsonify({'success': False, 'error': 'Invalid file type for track 2'}), 400
+            
+            # Clean filename - remove spaces and special chars, keep only alphanumeric, dash, underscore
+            filename2 = secure_filename(file2.filename)
+            # Further clean: remove spaces and special characters
+            name_part, ext = os.path.splitext(filename2)
+            clean_name = ''.join(c for c in name_part if c.isalnum() or c in '-_')
+            clean_name = clean_name.replace(' ', '_')
+            filename2 = f"{clean_name}{ext}"
+            
+            track2_path = os.path.abspath(os.path.join(UPLOAD_FOLDER, filename2))
+            file2.save(track2_path)
+            track2_name = os.path.splitext(filename2)[0]
+            
+            print(f"✅ Uploaded track 2: {filename2}")
+            print(f"   Path: {track2_path}")
+            
+            # Run calibration
+            try:
+                subprocess.run([
+                    'python', '-m', 'calibrate.calibrate_simple',
+                    track2_path,
+                    '--no-stems'
+                ], capture_output=True, text=True, check=True, timeout=60)
+                print(f"✅ Calibrated track 2")
+            except Exception as e:
+                print(f"⚠️  Calibration warning for track 2: {e}")
+        
+        elif 'file2_path' in request.form:
+            # Track 2 is from library
+            track2_path = request.form['file2_path']
+            track2_name = os.path.splitext(os.path.basename(track2_path))[0]
+            print(f"✅ Using library track 2: {track2_name}")
+        
+        else:
+            return jsonify({'success': False, 'error': 'No track 2 provided'}), 400
+        
+        # Store paths in session for crossfade
+        session['track1_path'] = track1_path
+        session['track2_path'] = track2_path
+        session['current_track_1'] = track1_name
+        session['current_track_2'] = track2_name
+        
+        # Set output path
+        output_name = f"{track1_name}_{track2_name}_mix.wav"
+        output_path = os.path.join(OUTPUT_DIR, output_name)
+        session['current_mix_path'] = output_path
+        
+        print(f"✅ Ready to mix: {track1_name} + {track2_name}")
+        
+        return jsonify({
+            'success': True,
+            'track1_name': track1_name,
+            'track2_name': track2_name,
+            'message': 'Tracks ready for mixing'
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in upload-and-mix: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/start-crossfade', methods=['POST'])
 def start_crossfade():
-    """
-    Handle crossfade request from the UI
-    This is where the magic happens!
-    """
+    """Handle crossfade request from the UI"""
     data = request.json
     track1_path = data.get('track1')
     track2_path = data.get('track2')
@@ -227,23 +348,11 @@ def start_crossfade():
     session['track1_path'] = track1_path
     session['track2_path'] = track2_path
     
-    # Run the crossfade in the background
-    # For now, we'll just prepare it - you can trigger actual processing here
     try:
-        # Example: Run the crossfade script
         output_name = f"{track1_info.get('title', 'track1')}_{track2_info.get('title', 'track2')}_mix.wav"
         output_path = os.path.join(OUTPUT_DIR, output_name)
-        
-        # Store the output path for playback
         session['current_mix_path'] = output_path
         
-        # Option 1: Run crossfade immediately (blocking - not recommended for production)
-        # result = run_crossfade(track1_path, track2_path, output_path)
-        
-        # Option 2: Queue the job (recommended - use Celery or similar)
-        # crossfade_task.delay(track1_path, track2_path, output_path)
-        
-        # For demo, just return success
         return jsonify({
             'success': True,
             'message': 'Crossfade started',
@@ -260,11 +369,7 @@ def start_crossfade():
 
 @app.route('/api/process-mix', methods=['POST'])
 def process_mix():
-    """
-    Process the mix (called from loading screen)
-    
-    ⚠️ THIS IS WHERE THE CROSSFADE ACTUALLY RUNS! ⚠️
-    """
+    """Process the mix (called from loading screen)"""
     track1_path = session.get('track1_path')
     track2_path = session.get('track2_path')
     
@@ -287,7 +392,6 @@ def process_mix():
             print(f"   Found: {premade_mix}")
             print("=" * 60)
             
-            # Copy pre-made mix to output path
             import shutil
             shutil.copy(premade_mix, output_path)
             
@@ -304,7 +408,6 @@ def process_mix():
         print(f"   Track 2: {track2_path}")
         print("=" * 60)
         
-        # ⭐ THIS LINE RUNS YOUR crossfade_stems.py SCRIPT ⭐
         result = run_crossfade(track1_path, track2_path, output_path)
         
         print("=" * 60)
@@ -332,18 +435,14 @@ def process_mix():
 
 def run_crossfade(track1_path, track2_path, output_path, 
                   fade_beats=16, fade_curve='equal_power'):
-    """
-    Run the crossfade_stems.py script
-    
-    This is where the actual DJ mixing happens!
-    """
+    """Run the crossfade_stems.py script"""
     
     # Try multiple possible locations for crossfade script
     possible_paths = [
-        '../dj_helpers/crossfade_stems.py',           # If in ai-dj-gui/
-        'dj_helpers/crossfade_stems.py',              # If in calhacks2025/
-        '../crossfade_stems.py',                      # If in root
-        'crossfade_stems.py'                          # Same directory
+        '../dj_helpers/crossfade_stems.py',
+        'dj_helpers/crossfade_stems.py',
+        '../crossfade_stems.py',
+        'crossfade_stems.py'
     ]
     
     crossfade_script = None
@@ -354,7 +453,6 @@ def run_crossfade(track1_path, track2_path, output_path,
             break
     
     if not crossfade_script:
-        # Try as module import
         print("⚠️  Crossfade script not found in expected locations")
         print("   Attempting to run as Python module...")
         cmd = [
@@ -367,7 +465,6 @@ def run_crossfade(track1_path, track2_path, output_path,
             '--metadata-dir', METADATA_DIR
         ]
     else:
-        # Run the script directly
         cmd = [
             'python', crossfade_script,
             track1_path,
@@ -390,7 +487,7 @@ def run_crossfade(track1_path, track2_path, output_path,
             capture_output=True,
             text=True,
             check=True,
-            timeout=300  # 5 minute timeout
+            timeout=300
         )
         
         print(result.stdout)
@@ -416,11 +513,28 @@ def run_crossfade(track1_path, track2_path, output_path,
         raise
 
 
+@app.route('/api/get-current-mix')
+def get_current_mix():
+    """Serve the current mix audio file"""
+    mix_path = session.get('current_mix_path')
+    
+    if not mix_path or not os.path.exists(mix_path):
+        print(f"❌ Mix file not found: {mix_path}")
+        return "Mix file not found", 404
+    
+    print(f"🎵 Serving mix: {mix_path}")
+    
+    return send_file(
+        mix_path,
+        mimetype='audio/wav',
+        as_attachment=False,
+        download_name='current_mix.wav'
+    )
+
+
 @app.route('/api/current-track', methods=['GET'])
 def current_track():
-    """
-    Get current playback info for the remix page
-    """
+    """Get current playback info for the remix page"""
     return jsonify({
         'current_track': session.get('current_track_1', 'Track 1'),
         'next_track': session.get('current_track_2', 'Track 2'),
@@ -434,14 +548,12 @@ def current_track():
 @app.route('/api/play', methods=['POST'])
 def play():
     """Resume playback"""
-    # TODO: Implement actual audio playback control
     return jsonify({'success': True})
 
 
 @app.route('/api/pause', methods=['POST'])
 def pause():
     """Pause playback"""
-    # TODO: Implement actual audio playback control
     return jsonify({'success': True})
 
 
@@ -453,7 +565,6 @@ def start_playlist():
     
     print(f"🎵 Starting auto-mix for playlist: {playlist_name}")
     
-    # TODO: Load playlist, queue songs, start auto-mixing
     session['playlist_mode'] = True
     session['current_playlist'] = playlist_name
     
@@ -462,9 +573,6 @@ def start_playlist():
         'playlist': playlist_name
     })
 
-@app.route('/party-mix')
-def party_mix():
-    return render_template('party_mix.html')
 
 if __name__ == '__main__':
     print("🎧 AI DJ Backend Starting...")
