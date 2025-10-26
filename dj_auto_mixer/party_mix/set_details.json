@@ -9,7 +9,7 @@
   "energy_curve": "wave",
   "exit_preference": "vibe_based",
   "output_file": "party_mix\\complete_dj_set.wav",
-  "total_duration": 254.21181405895692,
+  "total_duration": 253.1281632653061,
   "effects_enabled": true,
   "effect_intensity": 1.0,
   "tracks": [
@@ -23,19 +23,19 @@
       "track": "DJGotUsFallinInLove",
       "exit_time": 59.559183673469384,
       "exit_reason": "Repetitive section detected",
-      "duration": 43.613514739229025
+      "duration": 43.62167800453515
     },
     {
       "track": "Summer",
       "exit_time": 59.8378231292517,
       "exit_reason": "Repetitive section detected",
-      "duration": 44.70961451247165
+      "duration": 44.671519274376415
     },
     {
       "track": "HotelRoomService",
       "exit_time": 89.88444444444444,
       "exit_reason": "Repetitive section detected",
-      "duration": 76.42219954648526
+      "duration": 75.36848072562358
     }
   ]
 }
