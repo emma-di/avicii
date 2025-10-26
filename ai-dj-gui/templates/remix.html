@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DJ - Live Mix</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Override some colors for the red theme */
+        .track-name {
+            color: var(--accent-red);
+            font-size: 2.5rem;
+            text-shadow:
+                0 0 5px #fff,
+                0 0 10px #ef4444,
+                0 0 20px #ef4444,
+                0 0 30px #ef4444;
+            animation: redPulse 2s infinite alternate;
+        }
+        
+        @keyframes redPulse {
+            from {
+                text-shadow:
+                    0 0 5px #fff,
+                    0 0 10px #ef4444,
+                    0 0 20px #ef4444,
+                    0 0 30px #ef4444;
+            }
+            to {
+                text-shadow:
+                    0 0 2px #fff,
+                    0 0 5px #ef4444,
+                    0 0 10px #ef4444;
+            }
+        }
+        
+        .waveform {
+            animation: waveformPulse 1s ease-in-out infinite alternate;
+        }
+        
+        @keyframes waveformPulse {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
+        }
+        
+        .now-playing-badge {
+            display: inline-block;
+            background: var(--accent-red);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-left: 15px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Audio Controls Styling - EXTREMELY PROMINENT */
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin: 20px auto 80px auto;
+            max-width: 1100px;
+            padding: 20px 40px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            position: relative;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        
+        .time-display {
+            font-family: var(--font-main);
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: white;
+            min-width: 70px;
+            text-align: center;
+            text-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.8),
+                0 0 10px rgba(255, 255, 255, 0.3);
+            letter-spacing: 1px;
+        }
+        
+        .progress-container {
+            flex: 1;
+            height: 100px;
+            cursor: pointer;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: linear-gradient(180deg, 
+                rgba(255, 255, 255, 0.15),
+                rgba(255, 255, 255, 0.05)
+            );
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                inset 0 2px 8px rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .progress-container:hover {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 
+                0 12px 40px rgba(168, 85, 247, 0.6),
+                inset 0 2px 8px rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+        }
+        
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                rgba(168, 85, 247, 0.9),   /* Purple */
+                rgba(139, 92, 246, 0.9),   /* Mid purple */
+                rgba(34, 211, 238, 0.9)    /* Cyan */
+            );
+            width: 0%;
+            transition: width 0.1s linear;
+            position: relative;
+            box-shadow: 
+                0 0 30px rgba(168, 85, 247, 0.8),
+                0 0 60px rgba(34, 211, 238, 0.6);
+        }
+        
+        .progress-handle {
+            position: absolute;
+            right: -2px;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(180deg, white, rgba(255, 255, 255, 0.9));
+            box-shadow: 
+                0 0 15px rgba(255, 255, 255, 1),
+                0 0 30px rgba(255, 255, 255, 0.8),
+                0 0 45px rgba(168, 85, 247, 0.6);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scaleX(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scaleX(1.8);
+            }
+        }
+        
+        .waveform-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 15px 5px;
+            pointer-events: none;
+        }
+        
+        .wave-bar {
+            width: 5px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 3px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .progress-container:hover .wave-bar {
+            background: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Button to load next songs */
+        .next-mix-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-family: var(--font-main);
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(168, 85, 247, 0.4);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: none;
+        }
+        
+        .next-mix-btn.show {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+        
+        .next-mix-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 30px rgba(168, 85, 247, 0.6);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(200px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Home button with headphone icon -->
+    <div class="header">
+        <div class="home-btn" onclick="window.location.href='/'">
+            <img src="{{ url_for('static', filename='images/Headphone_Home.png') }}" 
+                 alt="Home" 
+                 style="width: 60px; height: 60px; cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); transition: transform 0.3s ease;"
+                 onmouseover="this.style.transform='scale(1.1) rotate(5deg)'"
+                 onmouseout="this.style.transform='scale(1)'">
+        </div>
+    </div>
+    
+    <div class="container remix-screen">
+        <!-- Audio player -->
+        <audio id="mixAudio" preload="auto">
+            <source src="/api/get-current-mix" type="audio/wav">
+            Your browser does not support the audio element.
+        </audio>
+        
+        <!-- Track name with NOW PLAYING badge -->
+        <div class="track-name">
+            <span id="current-track">{{ current_track_1 if current_track_1 else "NOW MIXING" }}</span>
+            <span class="now-playing-badge">● LIVE</span>
+        </div>
+        
+        <!-- Audio progress bar - PROMINENT AND ABOVE DISCS -->
+        <div class="audio-controls">
+            <div class="time-display" id="currentTime">0:00</div>
+            <div class="progress-container" onclick="seekAudio(event)">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-handle"></div>
+                </div>
+                <div class="waveform-overlay">
+                    <!-- Visual waveform bars -->
+                    <div class="wave-bar" style="height: 30%;"></div>
+                    <div class="wave-bar" style="height: 60%;"></div>
+                    <div class="wave-bar" style="height: 45%;"></div>
+                    <div class="wave-bar" style="height: 75%;"></div>
+                    <div class="wave-bar" style="height: 40%;"></div>
+                    <div class="wave-bar" style="height: 80%;"></div>
+                    <div class="wave-bar" style="height: 50%;"></div>
+                    <div class="wave-bar" style="height: 70%;"></div>
+                    <div class="wave-bar" style="height: 45%;"></div>
+                    <div class="wave-bar" style="height: 75%;"></div>
+                    <div class="wave-bar" style="height: 55%;"></div>
+                    <div class="wave-bar" style="height: 65%;"></div>
+                    <div class="wave-bar" style="height: 50%;"></div>
+                    <div class="wave-bar" style="height: 80%;"></div>
+                    <div class="wave-bar" style="height: 55%;"></div>
+                    <div class="wave-bar" style="height: 70%;"></div>
+                    <div class="wave-bar" style="height: 45%;"></div>
+                    <div class="wave-bar" style="height: 60%;"></div>
+                    <div class="wave-bar" style="height: 50%;"></div>
+                    <div class="wave-bar" style="height: 75%;"></div>
+                    <div class="wave-bar" style="height: 40%;"></div>
+                    <div class="wave-bar" style="height: 70%;"></div>
+                    <div class="wave-bar" style="height: 55%;"></div>
+                    <div class="wave-bar" style="height: 80%;"></div>
+                    <div class="wave-bar" style="height: 60%;"></div>
+                </div>
+            </div>
+            <div class="time-display" id="totalTime">0:00</div>
+        </div>
+        
+        <!-- Turntables -->
+        <div class="turntables">
+        <div class="turntables">
+            <!-- Left Turntable -->
+            <div class="turntable">
+                <div class="turntable-disc">
+                    <img src="{{ url_for('static', filename='images/purple_disc.png') }}" 
+                         class="rotating" alt="Track 1" id="left-disc">
+                    <div class="track-label" id="left-track-label">
+                        {{ current_track_1 if current_track_1 else "DISC 1" }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Center Controls -->
+            <div class="center-controls">
+                <div class="play-pause-btn" onclick="togglePlay()">||</div>
+                <div class="track-info">
+                    <span class="info-label">BPM:</span>
+                    <span id="current-bpm">{{ bpm if bpm else "128" }}</span>
+                </div>
+                <div class="track-info">
+                    <span class="info-label">KEY:</span>
+                    <span id="current-key">{{ key if key else "C major" }}</span>
+                </div>
+            </div>
+            
+            <!-- Right Turntable -->
+            <div class="turntable">
+                <div class="turntable-disc">
+                    <img src="{{ url_for('static', filename='images/cyan_disc.png') }}" 
+                         class="rotating" alt="Track 2" id="right-disc">
+                    <div class="track-label" id="right-track-label">
+                        {{ current_track_2 if current_track_2 else "DISC 2" }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Up Next -->
+        <div class="up-next">
+            <span class="up-next-label">UP NEXT:</span>
+            <span id="next-track">{{ current_track_2 if current_track_2 else "Next track loading..." }}</span>
+        </div>
+        
+        <!-- Load Next Songs Button (appears when mix ends) -->
+        <button class="next-mix-btn" id="nextMixBtn" onclick="loadNextSongs()">
+            🎵 Load Next Songs
+        </button>
+    </div>
+    
+    <script>
+        let isPlaying = false;
+        const audioElement = document.getElementById('mixAudio');
+        const progressFill = document.getElementById('progressFill');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const totalTimeDisplay = document.getElementById('totalTime');
+        const nextMixBtn = document.getElementById('nextMixBtn');
+        
+        // Get individual song durations (fake the "live" aspect)
+        // In reality, we're playing a pre-made mix, but we show individual song times
+        let song1Duration = 0;
+        let song2Duration = 0;
+        let mixDuration = 0;
+        let crossfadePoint = 0;  // Where song 1 ends and song 2 begins
+        
+        // Format time as MM:SS
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // Update progress bar and time displays
+        function updateProgress() {
+            if (audioElement.duration) {
+                const currentTime = audioElement.currentTime;
+                
+                // Calculate which song we're in
+                // For demo purposes, assume crossfade happens at midpoint
+                const halfPoint = audioElement.duration / 2;
+                
+                let displayTime, totalTime;
+                
+                if (currentTime < halfPoint) {
+                    // Playing song 1
+                    displayTime = currentTime;
+                    totalTime = halfPoint;
+                    // Highlight disc 1
+                    highlightActiveDisc(1);
+                } else {
+                    // Playing song 2
+                    displayTime = currentTime - halfPoint;
+                    totalTime = audioElement.duration - halfPoint;
+                    // Highlight disc 2
+                    highlightActiveDisc(2);
+                }
+                
+                // Update displays
+                const progress = (currentTime / audioElement.duration) * 100;
+                progressFill.style.width = progress + '%';
+                currentTimeDisplay.textContent = formatTime(displayTime);
+                totalTimeDisplay.textContent = formatTime(totalTime);
+            }
+        }
+        
+        // Highlight the currently playing disc
+        function highlightActiveDisc(discNumber) {
+            const disc1 = document.querySelector('.vinyl-left');
+            const disc2 = document.querySelector('.vinyl-right');
+            
+            if (!disc1 || !disc2) return;
+            
+            if (discNumber === 1) {
+                disc1.style.opacity = '1';
+                disc2.style.opacity = '0.6';
+            } else {
+                disc1.style.opacity = '0.6';
+                disc2.style.opacity = '1';
+            }
+        }
+        
+        // Seek to position when clicking progress bar
+        function seekAudio(event) {
+            const progressContainer = event.currentTarget;
+            const rect = progressContainer.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            audioElement.currentTime = percentage * audioElement.duration;
+        }
+        
+        // Audio event listeners
+        audioElement.addEventListener('loadedmetadata', () => {
+            totalTimeDisplay.textContent = formatTime(audioElement.duration);
+            // Auto-play when loaded
+            audioElement.play().then(() => {
+                isPlaying = true;
+                document.querySelector('.play-pause-btn').textContent = '||';
+            }).catch(err => {
+                console.log('Autoplay prevented:', err);
+                // Autoplay was blocked, user needs to click play
+            });
+        });
+        
+        audioElement.addEventListener('timeupdate', updateProgress);
+        
+        audioElement.addEventListener('ended', () => {
+            console.log('Mix finished!');
+            isPlaying = false;
+            document.querySelector('.play-pause-btn').textContent = '▶';
+            // Show "Load Next Songs" button
+            nextMixBtn.classList.add('show');
+        });
+        
+        audioElement.addEventListener('error', (e) => {
+            console.error('Audio error:', e);
+            alert('Error loading audio. Check console for details.');
+        });
+        
+        function togglePlay() {
+            const btn = event.target;
+            if (isPlaying) {
+                btn.textContent = '▶';
+                // Pause audio playback
+                audioElement.pause();
+                isPlaying = false;
+            } else {
+                btn.textContent = '||';
+                // Resume audio playback
+                audioElement.play();
+                isPlaying = true;
+            }
+        }
+        
+        function loadNextSongs() {
+            // Redirect back to song selection page
+            window.location.href = '/new';
+        }
+        
+        // Poll for track updates every 2 seconds
+        setInterval(() => {
+            fetch('/api/current-track')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.current_track) {
+                        document.getElementById('current-track').textContent = data.current_track;
+                    }
+                    if (data.next_track) {
+                        document.getElementById('next-track').textContent = data.next_track;
+                    }
+                    if (data.bpm) {
+                        document.getElementById('current-bpm').textContent = data.bpm;
+                    }
+                    if (data.key) {
+                        document.getElementById('current-key').textContent = data.key;
+                    }
+                    if (data.left_track) {
+                        document.getElementById('left-track-label').textContent = data.left_track;
+                    }
+                    if (data.right_track) {
+                        document.getElementById('right-track-label').textContent = data.right_track;
+                    }
+                })
+                .catch(err => console.error('Error fetching track info:', err));
+        }, 2000);
+    </script>
+</body>
+</html>

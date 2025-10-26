@@ -1,37 +1,44 @@
 # crossfade.py
-# python -m dj_helpers.crossfade data/mp3s/Dynamite.mp3 data/mp3s/Summer.mp3 --fade-beats 16 --out-path data/mixes/mix.wav
-
-# Option 1: Auto-detect (16 bars from end) - DEFAULT
-# python -m dj_helpers.crossfade Song1.mp3 Song2.mp3
-
-# Option 2: Specify bar number
-# python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --fade-start-bar 48
-
-# Option 3: Specify exact time in seconds
-# python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --fade-start-time 125.5
-
-# FULL USAGE EXAMPLE
-# # Full DJ transition: bass at 50%, vocals at 70%, then restore tempo
-# python -m dj_helpers.crossfade data/mp3s/Dynamite.mp3 data/mp3s/Summer.mp3 `
-#   --fade-start-time 180.0 `
-#   --fade-beats 32 `
-#   --bass-transition 0.5 `
-#   --voice-transition 0.7 `
-#   --restore-tempo `
-#   --restore-after-bars 12 `
-#   -o mixes/perfect_transition.wav
-
-# # Quick mix with voice control
-# python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 \
-#   --fade-beats 16 \
-#   --voice-transition 0.6 \
-#   --track2-start-bar 8
-
-# # Long blend with tempo restoration
-# python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 \
-#   --fade-start-bar 32 \
-#   --fade-beats 64 \
-#   --restore-tempo
+# DJ-style crossfading with bass and voice transition control
+#
+# USAGE EXAMPLES:
+#
+# Basic crossfade with defaults (16 beat fade, auto-detect start):
+#   python -m dj_helpers.crossfade data/mp3s/Song1.mp3 data/mp3s/Song2.mp3
+#
+# Custom fade: start at bar 64, fade over 32 beats:
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --fade-start-bar 64 --fade-beats 32
+#
+# Start track 2 from its 8th bar (skip intro):
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --track2-start-bar 8
+#
+# Specify exact fade start time in seconds:
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --fade-start-time 125.5
+#
+# Delay bass swap until 70% through the fade:
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --bass-transition 0.7
+#
+# Enable voice transition at 60% through fade:
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --voice-transition 0.6
+#
+# Restore to original tempo after crossfade (EXPERIMENTAL):
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 --restore-tempo --restore-after-bars 8
+#
+# Full advanced transition (PowerShell - use backticks):
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 `
+#     --fade-start-time 180.0 `
+#     --fade-beats 32 `
+#     --bass-transition 0.5 `
+#     --voice-transition 0.7 `
+#     -o mixes/perfect_transition.wav
+#
+# Full advanced transition (Bash/Linux - use backslashes):
+#   python -m dj_helpers.crossfade Song1.mp3 Song2.mp3 \
+#     --fade-start-time 180.0 \
+#     --fade-beats 32 \
+#     --bass-transition 0.5 \
+#     --voice-transition 0.7 \
+#     -o mixes/perfect_transition.wav
 
 import json
 import os
@@ -54,7 +61,7 @@ class DJCrossfader:
     - Voice/vocal separation and transition (optional)
     - Bar-aligned mixing points
     - Tempo matching via time-stretching
-    - Return to original tempo after crossfade (optional)
+    - Return to original tempo after crossfade (optional, experimental)
     """
     
     def __init__(self, sr: int = 44100):
@@ -276,23 +283,58 @@ class DJCrossfader:
         mix_before = y1[:fade_start_sample]
         
         # Part 2: During crossfade
-        crossfade_len = min(fade_samples, len(y1) - fade_start_sample, len(y2_trimmed))
+        # Check if we need to pad either track
+        track1_remaining = len(y1) - fade_start_sample
+        track2_available = len(y2_trimmed)
         
-        # Get segments
-        t1_bass = bass1[fade_start_sample:fade_start_sample + crossfade_len]
-        t2_bass = bass2[:crossfade_len]
+        if track1_remaining < fade_samples:
+            # Track 1 ends before fade completes - pad with silence
+            print(f"⚠️  Track 1 ends before fade completes, padding with {(fade_samples - track1_remaining) / self.sr:.2f}s silence")
+            y1_padded = np.concatenate([y1, np.zeros(fade_samples - track1_remaining)])
+            # Re-separate bass/mids from padded track
+            bass1_padded, mids_highs1_padded = self.separate_bass(y1_padded)
+            if voice_transition_ratio is not None:
+                voice1_padded, non_voice1_padded = self.separate_voice(mids_highs1_padded)
+        else:
+            y1_padded = y1
+            bass1_padded = bass1
+            mids_highs1_padded = mids_highs1
+            if voice_transition_ratio is not None:
+                voice1_padded = voice1
+                non_voice1_padded = non_voice1
+        
+        if track2_available < fade_samples:
+            # Track 2 is too short - pad with silence
+            print(f"⚠️  Track 2 is shorter than fade duration, padding with {(fade_samples - track2_available) / self.sr:.2f}s silence")
+            y2_padded = np.concatenate([y2_trimmed, np.zeros(fade_samples - track2_available)])
+            # Re-separate bass/mids from padded track
+            bass2_padded, mids_highs2_padded = self.separate_bass(y2_padded)
+            if voice_transition_ratio is not None:
+                voice2_padded, non_voice2_padded = self.separate_voice(mids_highs2_padded)
+        else:
+            y2_padded = y2_trimmed
+            bass2_padded = bass2
+            mids_highs2_padded = mids_highs2
+            if voice_transition_ratio is not None:
+                voice2_padded = voice2
+                non_voice2_padded = non_voice2
+        
+        # Now extract the full crossfade segments
+        crossfade_len = fade_samples
+        
+        # Get segments for crossfade
+        t1_bass = bass1_padded[fade_start_sample:fade_start_sample + crossfade_len]
+        t2_bass = bass2_padded[:crossfade_len]
         
         if voice_transition_ratio is not None:
             # With voice handling
-            t1_voice = voice1[fade_start_sample:fade_start_sample + crossfade_len]
-            t1_non_voice = non_voice1[fade_start_sample:fade_start_sample + crossfade_len]
-            t2_voice = voice2[:crossfade_len]
-            t2_non_voice = non_voice2[:crossfade_len]
+            t1_voice = voice1_padded[fade_start_sample:fade_start_sample + crossfade_len]
+            t1_non_voice = non_voice1_padded[fade_start_sample:fade_start_sample + crossfade_len]
+            t2_voice = voice2_padded[:crossfade_len]
+            t2_non_voice = non_voice2_padded[:crossfade_len]
             
             # Crossfade non-voice mids with main curve
-            fades_out = fade_out[:crossfade_len]
-            fades_in = fade_in[:crossfade_len]
-            non_voice_mixed = t1_non_voice * fades_out + t2_non_voice * fades_in
+            non_voice_mixed = t1_non_voice * fade_out + t2_non_voice * fade_in
             
             # Voice transition: sharp swap at the transition point
             voice_fade = np.ones(crossfade_len)
@@ -303,11 +345,9 @@ class DJCrossfader:
             mids_mixed = non_voice_mixed + voice_mixed
         else:
             # Without voice handling (original behavior)
-            t1_mids = mids_highs1[fade_start_sample:fade_start_sample + crossfade_len]
-            t2_mids = mids_highs2[:crossfade_len]
-            fades_out = fade_out[:crossfade_len]
-            fades_in = fade_in[:crossfade_len]
-            mids_mixed = t1_mids * fades_out + t2_mids * fades_in
+            t1_mids = mids_highs1_padded[fade_start_sample:fade_start_sample + crossfade_len]
+            t2_mids = mids_highs2_padded[:crossfade_len]
+            mids_mixed = t1_mids * fade_out + t2_mids * fade_in
         
         # Bass transition: sharper swap at the transition point
         bass_fade = np.ones(crossfade_len)
@@ -318,48 +358,34 @@ class DJCrossfader:
         mix_crossfade = bass_mixed + mids_mixed
         
         # Part 3: After crossfade
-        if restore_tempo and abs(bpm_ratio - 1.0) > 0.01:
-            # Gradually restore to original tempo
+        remaining_track2 = y2_padded[crossfade_len:] if track2_available < fade_samples else y2_trimmed[crossfade_len:]
+        
+        if restore_tempo and abs(bpm_ratio - 1.0) > 0.01 and len(remaining_track2) > 0:
+            # SIMPLIFIED tempo restoration to avoid overlapping bugs
             print(f"🔄 Restoring tempo after {restore_after_bars} bars...")
             
             # Calculate when to start tempo restoration
             restore_start_samples = int(self.beat_to_seconds(barmap1, restore_after_bars * 4) * self.sr)
             
-            # Segment after crossfade
-            immediate_after = y2_trimmed[crossfade_len:crossfade_len + restore_start_samples]
-            
-            # The part to restore
-            to_restore = y2_trimmed[crossfade_len + restore_start_samples:]
-            
-            # Get original audio starting from same point
-            original_start_sample = track2_start_sample + crossfade_len + restore_start_samples
-            if original_start_sample < len(y2_original):
-                # Create a tempo restoration: gradually transition from stretched to original
-                restore_duration = min(len(to_restore), len(y2_original) - original_start_sample)
-                restore_duration = int(restore_duration * 0.5)  # Use first half for transition
+            if len(remaining_track2) > restore_start_samples:
+                # Keep stretched version for a bit
+                immediate_after = remaining_track2[:restore_start_samples]
                 
-                # Simple crossfade between stretched and original versions
-                t2_stretched_segment = to_restore[:restore_duration]
-                t2_original_segment = y2_original[original_start_sample:original_start_sample + restore_duration]
+                # Then switch to original tempo for the rest
+                # Calculate where we are in the original track
+                elapsed_in_stretched = (crossfade_len + restore_start_samples) / bpm_ratio
+                original_position = int(track2_start_sample + elapsed_in_stretched)
                 
-                # Make sure they're the same length
-                min_len = min(len(t2_stretched_segment), len(t2_original_segment))
-                t2_stretched_segment = t2_stretched_segment[:min_len]
-                t2_original_segment = t2_original_segment[:min_len]
-                
-                # Crossfade from stretched to original tempo
-                restore_fade = np.linspace(0, 1, min_len)
-                restored_segment = (t2_stretched_segment * (1 - restore_fade) + 
-                                  t2_original_segment * restore_fade)
-                
-                # Continue with original tempo
-                final_segment = y2_original[original_start_sample + min_len:]
-                
-                mix_after = np.concatenate([immediate_after, restored_segment, final_segment])
+                if original_position < len(y2_original):
+                    # Continue with original tempo from this point
+                    mix_after = np.concatenate([immediate_after, y2_original[original_position:]])
+                else:
+                    # Just use what we have
+                    mix_after = remaining_track2
             else:
-                mix_after = np.concatenate([immediate_after, to_restore])
+                mix_after = remaining_track2
         else:
-            mix_after = y2_trimmed[crossfade_len:]
+            mix_after = remaining_track2
         
         # Concatenate all parts
         mix_final = np.concatenate([mix_before, mix_crossfade, mix_after])
@@ -447,7 +473,7 @@ def main():
     parser.add_argument(
         "--restore-tempo",
         action="store_true",
-        help="Gradually restore track2 to its original tempo after crossfade"
+        help="Gradually restore track2 to its original tempo after crossfade (EXPERIMENTAL)"
     )
     parser.add_argument(
         "--restore-after-bars",

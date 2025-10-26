@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DJ - Welcome</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container home-screen">
+        <h1 class="welcome-title">Welcome DJs</h1>
+        
+        <div class="disc-options">
+            <!-- New Playlist Disc -->
+            <div class="vinyl-disc" onclick="window.location.href='/new'">
+                <img src="{{ url_for('static', filename='images/purple_disc.png') }}" 
+                     alt="New Mix" 
+                     class="rotating">
+                <div class="disc-label" style="color: var(--accent-purple);">+ NEW MIX</div>
+            </div>
+            
+            <!-- Library Disc -->
+            <div class="vinyl-disc" onclick="window.location.href='/library'">
+                <img src="{{ url_for('static', filename='images/cyan_disc.png') }}" 
+                     alt="Library" 
+                     class="rotating">
+                <div class="disc-label" style="color: var(--accent-cyan);">LIBRARY</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Optional: Add some interactivity
+        document.querySelectorAll('.vinyl-disc').forEach(disc => {
+            disc.addEventListener('mouseenter', () => {
+                // Could add sound effects here
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DJ - Library</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Home button with headphone icon -->
+    <div class="header">
+        <div class="home-btn" onclick="window.location.href='/'">
+            <img src="{{ url_for('static', filename='images/Headphone_Home.png') }}" 
+                 alt="Home" 
+                 style="width: 60px; height: 60px; cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); transition: transform 0.3s ease;"
+                 onmouseover="this.style.transform='scale(1.1) rotate(5deg)'"
+                 onmouseout="this.style.transform='scale(1)'">
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="screen-container">
+            <!-- Turntables at top -->
+            <div class="controls-top">
+                <div class="turntable">
+                    <div class="turntable-disc">
+                        <img src="{{ url_for('static', filename='images/purple_disc.png') }}" 
+                             class="rotating" alt="Left Deck">
+                    </div>
+                </div>
+                
+                <div class="center-controls">
+                    <div class="play-pause-btn" onclick="startPlaylist()">▶</div>
+                    <div class="play-pause-btn" style="font-size: 3rem;">||</div>
+                </div>
+                
+                <div class="turntable">
+                    <div class="turntable-disc">
+                        <img src="{{ url_for('static', filename='images/cyan_disc.png') }}" 
+                             class="rotating" alt="Right Deck">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Playlist list -->
+            <div class="song-list-container">
+                <div class="playlist-header">Your Playlists</div>
+                
+                <ul class="song-list" id="playlist-list">
+                    {% if playlists %}
+                        {% for playlist in playlists %}
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="{{ playlist.name }}">
+                            <div class="song-title">{{ loop.index }}. {{ playlist.name }}</div>
+                            <div class="song-meta">
+                                <span>{{ playlist.song_count }} songs</span>
+                                <span>{{ playlist.duration }} min</span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Summer Vibes Mix">
+                            <div class="song-title">1. Summer Vibes Mix</div>
+                            <div class="song-meta"><span>5 songs</span><span>18 min</span></div>
+                        </li>
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Workout Playlist">
+                            <div class="song-title">2. Workout Playlist</div>
+                            <div class="song-meta"><span>8 songs</span><span>32 min</span></div>
+                        </li>
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Chill Evening">
+                            <div class="song-title">3. Chill Evening</div>
+                            <div class="song-meta"><span>6 songs</span><span>24 min</span></div>
+                        </li>
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Night Drive">
+                            <div class="song-title">4. Night Drive</div>
+                            <div class="song-meta"><span>10 songs</span><span>42 min</span></div>
+                        </li>
+                        <li class="song-item" onclick="selectPlaylist(this)" data-playlist="Party Mix">
+                            <div class="song-title">5. Party Mix</div>
+                            <div class="song-meta"><span>12 songs</span><span>48 min</span></div>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedPlaylist = null;
+        
+        function selectPlaylist(element) {
+            document.querySelectorAll('.song-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            selectedPlaylist = element.dataset.playlist || element.querySelector('.song-title').textContent.split('. ')[1];
+        }
+        
+        function startPlaylist() {
+            if (!selectedPlaylist) {
+                alert('Please select a playlist first!');
+                return;
+            }
+            
+            // Send playlist to backend for auto-mixing
+            fetch('/api/start-playlist', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({playlist: selectedPlaylist, mode: 'auto'})
+            }).then(() => {
+                window.location.href = '/loading';
+            }).catch(err => {
+                console.error('Error starting playlist:', err);
+                window.location.href = '/loading';
+            });
+        }
+    </script>
+</body>
+</html>

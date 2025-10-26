@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DJ - Loading</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <!-- Home button with headphone icon -->
+    <div class="header">
+        <div class="home-btn" onclick="window.location.href='/'">
+            <img src="{{ url_for('static', filename='images/Headphone_Home.png') }}" 
+                 alt="Home" 
+                 style="width: 60px; height: 60px; cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); transition: transform 0.3s ease;"
+                 onmouseover="this.style.transform='scale(1.1) rotate(5deg)'"
+                 onmouseout="this.style.transform='scale(1)'">
+        </div>
+    </div>
+    
+    <div class="container loading-screen">
+        <div class="loading-bar-container">
+            <div class="loading-text" id="loadingText">Preparing mix...</div>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loadingProgress"></div>
+            </div>
+            <div class="loading-status" id="loadingStatus" style="margin-top: 20px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.6);"></div>
+        </div>
+    </div>
+    
+    <script>
+        const loadingText = document.getElementById('loadingText');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const loadingProgress = document.getElementById('loadingProgress');
+        
+        let loadingMessages = [
+            'Analyzing tracks...',
+            'Finding optimal mix points...',
+            'Aligning beats...',
+            'Blending stems...',
+            'Almost ready...'
+        ];
+        
+        let messageIndex = 0;
+        let isProcessing = true;
+        
+        // Update loading messages
+        const messageInterval = setInterval(() => {
+            if (!isProcessing) {
+                clearInterval(messageInterval);
+                return;
+            }
+            
+            messageIndex = (messageIndex + 1) % loadingMessages.length;
+            loadingText.textContent = loadingMessages[messageIndex];
+        }, 1500);
+        
+        // Start processing the mix
+        setTimeout(() => {
+            loadingStatus.textContent = 'Processing your mix...';
+            
+            fetch('/api/process-mix', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                isProcessing = false;
+                clearInterval(messageInterval);
+                
+                if (data.success) {
+                    loadingProgress.style.width = '100%';
+                    
+                    if (data.mode === 'premade') {
+                        loadingText.textContent = '✨ Mix ready!';
+                        loadingStatus.textContent = 'Using optimized mix';
+                    } else {
+                        loadingText.textContent = '✅ Mix created!';
+                        loadingStatus.textContent = 'Fresh mix generated';
+                    }
+                    
+                    setTimeout(() => {
+                        window.location.href = '/remix';
+                    }, 1000);
+                } else {
+                    loadingText.textContent = '❌ Error';
+                    loadingStatus.textContent = data.error || 'Failed to create mix';
+                }
+            })
+            .catch(err => {
+                isProcessing = false;
+                clearInterval(messageInterval);
+                console.error('Error processing mix:', err);
+                loadingText.textContent = '⚠️ Processing issue';
+                loadingStatus.textContent = 'Redirecting anyway...';
+                setTimeout(() => {
+                    window.location.href = '/remix';
+                }, 2000);
+            });
+        }, 500);
+    </script>
+</body>
+</html>
