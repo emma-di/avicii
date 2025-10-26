@@ -1,0 +1,40 @@
+{
+  "track_order": [
+    "Dynamite",
+    "DJGotUsFallinInLove",
+    "Summer",
+    "HotelRoomService"
+  ],
+  "sequencing_strategy": "auto",
+  "energy_curve": "wave",
+  "exit_preference": "early",
+  "output_file": "my_dj_mix\\complete_dj_set.wav",
+  "total_duration": 234.22820861678005,
+  "effects_enabled": true,
+  "tracks": [
+    {
+      "track": "Dynamite",
+      "exit_time": 67.4867246980425,
+      "exit_reason": "Repetitive section detected (similarity: 0.98) & Energy dip (level: 0.78) (1960 indicators)",
+      "duration": 67.4867120181406
+    },
+    {
+      "track": "DJGotUsFallinInLove",
+      "exit_time": 67.4930471953968,
+      "exit_reason": "Energy dip (level: 0.84) & Repetitive section detected (similarity: 0.98) (1959 indicators)",
+      "duration": 54.74809523809524
+    },
+    {
+      "track": "Summer",
+      "exit_time": 67.51295376926281,
+      "exit_reason": "Energy dip (level: 0.84) & Energy dip (level: 0.85) (1960 indicators)",
+      "duration": 55.373877551020406
+    },
+    {
+      "track": "HotelRoomService",
+      "exit_time": 67.37653223611272,
+      "exit_reason": "Energy dip (level: 0.42) & Energy dip (level: 0.89) (1941 indicators)",
+      "duration": 56.61952380952381
+    }
+  ]
+}
