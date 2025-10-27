@@ -1,26 +1,27 @@
 """
-Enhanced DJ Effects System
-STRONGER, MORE NOTICEABLE effects for rave-style mixes
+PARTY DJ Effects System
+BALANCED effects with selective bass boost (not constant!)
+Makes it OBVIOUS a DJ mixed this, but not jarring!
 """
 
 import numpy as np
 from scipy import signal
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 import librosa
 
 
 class DJEffects:
     """
-    Professional DJ effects processor with STRONG, noticeable effects
+    Professional DJ effects processor with BALANCED effects
     
     Effects include:
-    - Aggressive filter buildups/sweeps
+    - Selective bass boost (only where appropriate)
+    - Filter buildups/sweeps
     - White noise risers
     - Echo outs with feedback
     - Reverb throws
     - Pitch shifts/drops
-    - Bitcrusher
-    - Synthetic air horns, sirens
+    - Beat drops
     """
     
     def __init__(self, sample_rate: int = 44100):
@@ -29,7 +30,7 @@ class DJEffects:
     def smart_effect_placement(self, audio: np.ndarray, track_analysis: Dict,
                               energy_level: str = 'medium') -> np.ndarray:
         """
-        Apply MULTIPLE strong effects based on track structure
+        Apply BALANCED DJ effects that enhance the mix naturally
         
         Args:
             audio: Audio data (samples x channels)
@@ -37,72 +38,263 @@ class DJEffects:
             energy_level: 'low', 'medium', or 'high'
             
         Returns:
-            Audio with NOTICEABLE effects applied
+            Audio with professional DJ effects
         """
         structure = track_analysis['structure']
         duration = len(audio) / self.sr
+        beat_grid = track_analysis.get('beat_grid', None)
+        bpm = track_analysis.get('bpm', 120)
         
-        print(f"      Applying {energy_level} energy effects...")
+        print(f"      🎧 Applying {energy_level} energy effects")
         
-        # EFFECT 1: Aggressive filter buildup in last 12-16 seconds
-        if duration > 15:
-            effect_start = duration - 14  # Last 14 seconds
-            effect_start_sample = int(effect_start * self.sr)
-            
-            if energy_level == 'high':
-                # Very aggressive high-pass filter
-                audio = self.apply_aggressive_filter_buildup(
-                    audio, effect_start_sample, 
-                    duration_sec=10.0, direction='highpass'
-                )
-                print(f"        ✓ Aggressive filter buildup")
-            elif energy_level == 'medium':
-                # Medium filter sweep
-                audio = self.apply_aggressive_filter_buildup(
-                    audio, effect_start_sample,
-                    duration_sec=8.0, direction='highpass'
-                )
-                print(f"        ✓ Filter buildup")
+        # Get beat times for synchronization
+        beat_times = self._extract_beat_times(beat_grid)
         
-        # EFFECT 2: Big reverb throw in middle
-        if duration > 30 and energy_level in ['high', 'medium']:
-            reverb_point = duration * 0.6  # 60% through track
-            audio = self.add_reverb_throw(audio, reverb_point, intensity=1.5)
-            print(f"        ✓ Reverb throw")
-        
-        # EFFECT 3: White noise riser before end
-        if duration > 20 and energy_level == 'high':
-            riser_start = duration - 8  # 8 seconds before end
-            audio = self.add_intense_riser(audio, riser_start, duration_sec=6.0)
-            print(f"        ✓ Intense riser")
-        
-        # EFFECT 4: Echo out at the very end
-        if duration > 10:
-            echo_start = duration - 6  # Last 6 seconds
-            echo_sample = int(echo_start * self.sr)
-            audio = self.apply_echo_out(audio, echo_sample, repeats=6, decay=0.65)
-            print(f"        ✓ Echo out")
-        
-        # EFFECT 5: Pitch drop (for high energy only)
-        if energy_level == 'high' and duration > 25:
-            drop_point = duration - 12
-            audio = self.add_pitch_drop(audio, drop_point)
-            print(f"        ✓ Pitch drop")
-        
-        # EFFECT 6: Synthetic air horn (high energy)
+        # EFFECT 1: SELECTIVE BASS BOOST (only in high energy sections, not constant!)
+        # Only boost bass for high energy tracks in specific sections
         if energy_level == 'high' and duration > 30:
-            horn_point = duration - 16
-            audio = self.add_air_horn(audio, horn_point)
-            print(f"        ✓ Air horn")
+            # Boost bass only in the middle section (the peak)
+            boost_start = duration * 0.3  # Start at 30%
+            boost_end = duration * 0.7    # End at 70%
+            audio = self.apply_selective_bass_boost(
+                audio, boost_start, boost_end, boost_db=4.0
+            )
+            print(f"        ✓ Selective bass boost ({boost_start:.1f}s - {boost_end:.1f}s)")
+        
+        # EFFECT 2: Beat drop (only for medium/high energy, in the middle)
+        if energy_level in ['medium', 'high'] and duration > 30 and len(beat_times) > 8:
+            drop_time = duration * 0.5  # Middle of track
+            drop_beat = self._find_nearest_beat(drop_time, beat_times)
+            audio = self.apply_beat_drop(audio, drop_beat, duration_beats=4, bpm=bpm)
+            print(f"        ✓ Beat drop at {drop_beat:.1f}s")
+        
+        # EFFECT 3: Filter buildup before exit (essential for transitions)
+        if duration > 15:
+            buildup_start = duration - 14
+            audio = self.apply_filter_buildup(
+                audio, int(buildup_start * self.sr), 
+                duration_sec=10.0, max_freq=2500
+            )
+            print(f"        ✓ Filter buildup")
+        
+        # EFFECT 4: Riser before climax (high energy only)
+        if energy_level == 'high' and duration > 20:
+            riser_start = duration - 10
+            audio = self.add_riser(audio, riser_start, duration_sec=6.0)
+            print(f"        ✓ Build riser")
+        
+        # EFFECT 5: Echo out at the end (classic DJ exit)
+        if duration > 10:
+            echo_start = duration - 7
+            audio = self.apply_echo_out(audio, int(echo_start * self.sr), repeats=6, decay=0.7)
+            print(f"        ✓ Echo out")
         
         return audio
     
-    def apply_aggressive_filter_buildup(self, audio: np.ndarray, start_sample: int,
-                                       duration_sec: float = 10.0, 
-                                       direction: str = 'highpass') -> np.ndarray:
+    def _extract_beat_times(self, beat_grid) -> List[float]:
+        """Extract beat times from BeatGrid object or list"""
+        beat_times = []
+        if beat_grid:
+            if hasattr(beat_grid, 'beat_times'):
+                beat_times = list(beat_grid.beat_times)
+            elif hasattr(beat_grid, 'beats'):
+                beat_times = list(beat_grid.beats)
+            elif isinstance(beat_grid, (list, np.ndarray)):
+                beat_times = list(beat_grid)
+        return beat_times
+    
+    def _find_nearest_beat(self, time: float, beat_times: List[float]) -> float:
+        """Find the nearest beat to a given time"""
+        if not beat_times:
+            return time
+        return min(beat_times, key=lambda x: abs(x - time))
+    
+    def apply_selective_bass_boost(self, audio: np.ndarray, start_time: float,
+                                   end_time: float, boost_db: float = 4.0) -> np.ndarray:
         """
-        AGGRESSIVE filter sweep - you will definitely hear this!
-        Removes bass gradually and dramatically
+        Boost bass only in a specific section - not the whole track!
+        This makes it feel more natural and less jarring
+        """
+        audio = audio.copy()
+        
+        start_sample = int(start_time * self.sr)
+        end_sample = int(end_time * self.sr)
+        
+        if start_sample >= len(audio) or end_sample <= start_sample:
+            return audio
+        
+        end_sample = min(end_sample, len(audio))
+        
+        # Extract the section to boost
+        section = audio[start_sample:end_sample].copy()
+        
+        # Create low shelf filter to boost bass (20-250Hz)
+        gain = 10 ** (boost_db / 20)
+        freq = 200  # Hz - boost below this
+        Q = 0.707
+        w0 = 2 * np.pi * freq / self.sr
+        alpha = np.sin(w0) / (2 * Q)
+        A = np.sqrt(gain)
+        
+        # Low shelf coefficients
+        b0 = A * ((A + 1) - (A - 1) * np.cos(w0) + 2 * np.sqrt(A) * alpha)
+        b1 = 2 * A * ((A - 1) - (A + 1) * np.cos(w0))
+        b2 = A * ((A + 1) - (A - 1) * np.cos(w0) - 2 * np.sqrt(A) * alpha)
+        a0 = (A + 1) + (A - 1) * np.cos(w0) + 2 * np.sqrt(A) * alpha
+        a1 = -2 * ((A - 1) + (A + 1) * np.cos(w0))
+        a2 = (A + 1) + (A - 1) * np.cos(w0) - 2 * np.sqrt(A) * alpha
+        
+        # Normalize
+        b = np.array([b0, b1, b2]) / a0
+        a = np.array([1, a1 / a0, a2 / a0])
+        
+        # Apply filter to section
+        if section.ndim == 1:
+            section = signal.filtfilt(b, a, section)
+        else:
+            for ch in range(section.shape[1]):
+                section[:, ch] = signal.filtfilt(b, a, section[:, ch])
+        
+        # Fade in/out the boost to avoid abrupt changes
+        fade_length = int(2.0 * self.sr)  # 2 second fade
+        if len(section) > fade_length * 2:
+            fade_in = np.linspace(0, 1, fade_length)
+            fade_out = np.linspace(1, 0, fade_length)
+            
+            if section.ndim == 1:
+                # Crossfade at start
+                audio[start_sample:start_sample + fade_length] = (
+                    audio[start_sample:start_sample + fade_length] * (1 - fade_in) +
+                    section[:fade_length] * fade_in
+                )
+                # Full boost in middle
+                audio[start_sample + fade_length:end_sample - fade_length] = section[fade_length:-fade_length]
+                # Crossfade at end
+                audio[end_sample - fade_length:end_sample] = (
+                    audio[end_sample - fade_length:end_sample] * (1 - fade_out) +
+                    section[-fade_length:] * fade_out
+                )
+            else:
+                fade_in_2d = fade_in[:, np.newaxis]
+                fade_out_2d = fade_out[:, np.newaxis]
+                audio[start_sample:start_sample + fade_length] = (
+                    audio[start_sample:start_sample + fade_length] * (1 - fade_in_2d) +
+                    section[:fade_length] * fade_in_2d
+                )
+                audio[start_sample + fade_length:end_sample - fade_length] = section[fade_length:-fade_length]
+                audio[end_sample - fade_length:end_sample] = (
+                    audio[end_sample - fade_length:end_sample] * (1 - fade_out_2d) +
+                    section[-fade_length:] * fade_out_2d
+                )
+        else:
+            # Section too short for fades, just apply directly
+            audio[start_sample:end_sample] = section
+        
+        return audio
+    
+    def apply_bass_boost(self, audio: np.ndarray, boost_db: float = 6.0) -> np.ndarray:
+        """
+        Boost the bass frequencies across entire track
+        NOTE: This is the OLD method - we now use selective_bass_boost instead!
+        """
+        audio = audio.copy()
+        
+        # Low shelf filter to boost bass (20-250Hz)
+        gain = 10 ** (boost_db / 20)
+        freq = 200  # Hz - boost below this
+        Q = 0.707
+        w0 = 2 * np.pi * freq / self.sr
+        alpha = np.sin(w0) / (2 * Q)
+        A = np.sqrt(gain)
+        
+        # Low shelf coefficients
+        b0 = A * ((A + 1) - (A - 1) * np.cos(w0) + 2 * np.sqrt(A) * alpha)
+        b1 = 2 * A * ((A - 1) - (A + 1) * np.cos(w0))
+        b2 = A * ((A + 1) - (A - 1) * np.cos(w0) - 2 * np.sqrt(A) * alpha)
+        a0 = (A + 1) + (A - 1) * np.cos(w0) + 2 * np.sqrt(A) * alpha
+        a1 = -2 * ((A - 1) + (A + 1) * np.cos(w0))
+        a2 = (A + 1) + (A - 1) * np.cos(w0) - 2 * np.sqrt(A) * alpha
+        
+        # Normalize
+        b = np.array([b0, b1, b2]) / a0
+        a = np.array([1, a1 / a0, a2 / a0])
+        
+        # Apply filter
+        if audio.ndim == 1:
+            audio = signal.filtfilt(b, a, audio)
+        else:
+            for ch in range(audio.shape[1]):
+                audio[:, ch] = signal.filtfilt(b, a, audio[:, ch])
+        
+        return audio
+    
+    def apply_beat_drop(self, audio: np.ndarray, drop_time: float, 
+                       duration_beats: int = 4, bpm: float = 120) -> np.ndarray:
+        """
+        BEAT DROP - remove bass/elements then DROP them back!
+        Classic DJ technique for building tension
+        """
+        audio = audio.copy()
+        
+        # Calculate duration in seconds
+        beat_duration = 60.0 / bpm
+        drop_duration = duration_beats * beat_duration
+        
+        drop_sample = int(drop_time * self.sr)
+        drop_length = int(drop_duration * self.sr)
+        end_sample = min(drop_sample + drop_length, len(audio))
+        
+        if drop_sample >= len(audio):
+            return audio
+        
+        # Get segment
+        segment = audio[drop_sample:end_sample].copy()
+        segment_length = len(segment)
+        
+        # Remove bass for first half (tension)
+        half_point = segment_length // 2
+        
+        # High-pass filter (remove bass)
+        sos = signal.butter(6, 300, 'highpass', fs=self.sr, output='sos')
+        
+        if segment.ndim == 1:
+            segment[:half_point] = signal.sosfilt(sos, segment[:half_point])
+            # Add slight volume reduction
+            segment[:half_point] *= 0.7
+        else:
+            for ch in range(segment.shape[1]):
+                segment[:half_point, ch] = signal.sosfilt(sos, segment[:half_point, ch])
+                segment[:half_point, ch] *= 0.7
+        
+        # Smooth crossfade back to full bass
+        fade_length = int(0.1 * self.sr)  # 100ms fade
+        if half_point + fade_length < segment_length:
+            fade = np.linspace(0, 1, fade_length)
+            
+            if segment.ndim == 1:
+                # Crossfade between filtered and original
+                filtered_section = segment[half_point:half_point + fade_length].copy()
+                original_section = audio[drop_sample + half_point:drop_sample + half_point + fade_length].copy()
+                segment[half_point:half_point + fade_length] = (
+                    filtered_section * (1 - fade) + original_section * fade
+                )
+            else:
+                for ch in range(segment.shape[1]):
+                    filtered_section = segment[half_point:half_point + fade_length, ch].copy()
+                    original_section = audio[drop_sample + half_point:drop_sample + half_point + fade_length, ch].copy()
+                    segment[half_point:half_point + fade_length, ch] = (
+                        filtered_section * (1 - fade) + original_section * fade
+                    )
+        
+        audio[drop_sample:end_sample] = segment
+        return audio
+    
+    def apply_filter_buildup(self, audio: np.ndarray, start_sample: int,
+                            duration_sec: float = 10.0, 
+                            max_freq: int = 2500) -> np.ndarray:
+        """
+        Filter buildup - gradually removes bass (not too aggressive)
+        Perfect for transitions
         """
         audio = audio.copy()
         duration_samples = int(duration_sec * self.sr)
@@ -114,25 +306,21 @@ class DJEffects:
         segment = audio[start_sample:end_sample]
         segment_length = len(segment)
         
-        # AGGRESSIVE frequency sweep
-        if direction == 'highpass':
-            freq_start = 80  # Hz - start low
-            freq_end = 4000  # Hz - end VERY high (removes almost everything)
-        else:
-            freq_start = 12000
-            freq_end = 300
+        # Moderate frequency sweep (not extreme)
+        freq_start = 100  # Hz - start low
+        freq_end = max_freq  # Hz - end at max_freq (2500Hz default)
         
-        # Apply MORE aggressively
-        chunk_size = int(self.sr * 0.05)  # 50ms chunks
+        # Apply filter gradually
+        chunk_size = int(self.sr * 0.1)  # 100ms chunks
         for i in range(0, segment_length, chunk_size):
             chunk_end = min(i + chunk_size, segment_length)
             progress = i / segment_length
             
-            # Exponential curve for more dramatic effect
-            current_freq = freq_start + (freq_end - freq_start) * (progress ** 2)
+            # Linear curve (smooth, not dramatic)
+            current_freq = freq_start + (freq_end - freq_start) * progress
             
-            # STEEP filter (order 8 instead of 4)
-            sos = signal.butter(8, current_freq, direction, fs=self.sr, output='sos')
+            # Moderate filter (order 4, not 8)
+            sos = signal.butter(4, current_freq, 'highpass', fs=self.sr, output='sos')
             
             if segment.ndim == 1:
                 segment[i:chunk_end] = signal.sosfilt(sos, segment[i:chunk_end])
@@ -146,7 +334,7 @@ class DJEffects:
     def apply_echo_out(self, audio: np.ndarray, start_sample: int,
                       repeats: int = 6, decay: float = 0.65) -> np.ndarray:
         """
-        Strong echo-out with MORE repeats and LONGER tail
+        Echo-out with repeats and tail
         """
         audio = audio.copy()
         
@@ -183,10 +371,10 @@ class DJEffects:
         
         return audio
     
-    def add_intense_riser(self, audio: np.ndarray, start_time: float,
-                         duration_sec: float = 6.0) -> np.ndarray:
+    def add_riser(self, audio: np.ndarray, start_time: float,
+                 duration_sec: float = 6.0) -> np.ndarray:
         """
-        INTENSE white noise riser - builds MASSIVE tension
+        White noise riser - builds tension before a drop
         """
         audio = audio.copy()
         start_sample = int(start_time * self.sr)
@@ -198,27 +386,18 @@ class DJEffects:
         
         riser_length = end_sample - start_sample
         
-        # Generate LOUD white noise
-        noise = np.random.normal(0, 0.15, riser_length)  # Increased amplitude
+        # Moderate white noise
+        noise = np.random.normal(0, 0.1, riser_length)  # Not too loud
         
         # High-pass filter
-        sos = signal.butter(6, 1000, 'highpass', fs=self.sr, output='sos')
+        sos = signal.butter(4, 1500, 'highpass', fs=self.sr, output='sos')
         noise_filtered = signal.sosfilt(sos, noise)
         
-        # STRONG amplitude envelope (exponential growth)
-        envelope = (np.linspace(0, 1, riser_length) ** 1.5) * 0.5  # Louder!
+        # Smooth amplitude envelope
+        envelope = np.linspace(0, 1, riser_length) * 0.3  # Moderate volume
         noise_shaped = noise_filtered * envelope
         
-        # Aggressive frequency sweep
-        for i in range(0, riser_length, int(self.sr * 0.05)):
-            chunk_end = min(i + int(self.sr * 0.05), riser_length)
-            progress = i / riser_length
-            sweep_freq = 1000 + progress * 10000  # 1kHz to 11kHz
-            
-            sos = signal.butter(4, sweep_freq, 'highpass', fs=self.sr, output='sos')
-            noise_shaped[i:chunk_end] = signal.sosfilt(sos, noise_shaped[i:chunk_end])
-        
-        # Mix with original (LOUDER)
+        # Mix with original
         if audio.ndim == 1:
             audio[start_sample:end_sample] += noise_shaped
         else:
@@ -226,138 +405,15 @@ class DJEffects:
                 audio[start_sample:end_sample, ch] += noise_shaped
         
         return audio
-    
-    def add_reverb_throw(self, audio: np.ndarray, throw_time: float, 
-                        intensity: float = 1.5) -> np.ndarray:
-        """
-        DRAMATIC reverb throw - sounds like throwing into a huge space
-        """
-        audio = audio.copy()
-        throw_sample = int(throw_time * self.sr)
-        
-        if throw_sample >= len(audio):
-            return audio
-        
-        # Create BIG reverb
-        delay_times = [0.029, 0.037, 0.041, 0.043, 0.053, 0.059]  # More delays
-        reverb_length = int(self.sr * 3.0)  # 3 second tail!
-        
-        end_sample = min(throw_sample + reverb_length, len(audio))
-        segment = audio[throw_sample:end_sample].copy()
-        
-        reverb = np.zeros_like(segment)
-        for delay_time in delay_times:
-            delay_samples = int(delay_time * self.sr)
-            if delay_samples < len(segment):
-                delayed = np.roll(segment, delay_samples, axis=0)
-                reverb += delayed * 0.7  # Strong reverb
-        
-        # Mix with strong intensity
-        audio[throw_sample:end_sample] = (
-            segment * (1 - intensity * 0.3) + reverb * intensity * 0.5
-        )
-        
-        return audio
-    
-    def add_pitch_drop(self, audio: np.ndarray, drop_time: float) -> np.ndarray:
-        """
-        Pitch drop effect - pitch down then back up
-        """
-        audio = audio.copy()
-        drop_sample = int(drop_time * self.sr)
-        drop_duration = int(self.sr * 2.0)  # 2 second effect
-        
-        end_sample = min(drop_sample + drop_duration, len(audio))
-        
-        if drop_sample >= len(audio) or end_sample <= drop_sample:
-            return audio
-        
-        segment_length = end_sample - drop_sample
-        
-        # Create pitch shift curve (down then up)
-        pitch_curve = np.zeros(segment_length)
-        mid_point = segment_length // 2
-        
-        # Down in first half
-        pitch_curve[:mid_point] = np.linspace(0, -4, mid_point)  # Down 4 semitones
-        # Up in second half
-        pitch_curve[mid_point:] = np.linspace(-4, 0, segment_length - mid_point)
-        
-        # Apply pitch shift
-        segment = audio[drop_sample:end_sample].copy()
-        
-        if segment.ndim == 1:
-            segment_mono = segment
-        else:
-            segment_mono = segment.mean(axis=1)
-        
-        # Simple pitch shift using resampling
-        shifted = librosa.effects.pitch_shift(
-            segment_mono, sr=self.sr, n_steps=-2
-        )
-        
-        if audio.ndim == 1:
-            audio[drop_sample:drop_sample + len(shifted)] = shifted[:len(segment)]
-        else:
-            for ch in range(audio.shape[1]):
-                audio[drop_sample:drop_sample + len(shifted), ch] = shifted[:len(segment)]
-        
-        return audio
-    
-    def add_air_horn(self, audio: np.ndarray, horn_time: float) -> np.ndarray:
-        """
-        Synthetic air horn sound (classic DJ effect)
-        """
-        audio = audio.copy()
-        horn_sample = int(horn_time * self.sr)
-        horn_duration = int(self.sr * 0.8)  # 800ms
-        
-        if horn_sample >= len(audio):
-            return audio
-        
-        # Generate synthetic air horn (descending tone)
-        t = np.linspace(0, 0.8, horn_duration)
-        
-        # Frequency sweep (descending)
-        freq_start = 400  # Hz
-        freq_end = 200    # Hz
-        freq = np.linspace(freq_start, freq_end, horn_duration)
-        
-        # Generate tone with harmonics
-        horn = np.zeros(horn_duration)
-        for harmonic in [1, 2, 3]:
-            horn += np.sin(2 * np.pi * freq * harmonic * t) / harmonic
-        
-        # Envelope
-        envelope = np.concatenate([
-            np.linspace(0, 1, horn_duration // 4),  # Attack
-            np.ones(horn_duration // 2),             # Sustain
-            np.linspace(1, 0, horn_duration // 4)    # Release
-        ])
-        
-        horn *= envelope * 0.3  # Amplitude
-        
-        # Add to audio
-        end_sample = min(horn_sample + horn_duration, len(audio))
-        actual_length = end_sample - horn_sample
-        
-        if audio.ndim == 1:
-            audio[horn_sample:end_sample] += horn[:actual_length]
-        else:
-            for ch in range(audio.shape[1]):
-                audio[horn_sample:end_sample, ch] += horn[:actual_length]
-        
-        return audio
 
 
 if __name__ == "__main__":
-    print("Enhanced DJ Effects System")
+    print("Enhanced DJ Effects System - BALANCED VERSION")
     print("=" * 60)
-    print("STRONG, noticeable effects:")
-    print("  ✓ Aggressive filter buildups")
-    print("  ✓ Intense white noise risers")
-    print("  ✓ Echo outs with long tail")
-    print("  ✓ Dramatic reverb throws")
-    print("  ✓ Pitch drops")
-    print("  ✓ Synthetic air horns")
-    print("\nThese effects are MUCH more noticeable!")
+    print("Professional effects that enhance without overwhelming:")
+    print("  ✓ Selective bass boost (only in appropriate sections)")
+    print("  ✓ Beat drops (tension and release)")
+    print("  ✓ Filter buildups (smooth transitions)")
+    print("  ✓ White noise risers (build energy)")
+    print("  ✓ Echo outs (classic DJ exit)")
+    print("\nBalanced and natural sounding!")

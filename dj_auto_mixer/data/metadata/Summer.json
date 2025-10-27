@@ -1,0 +1,11 @@
+{
+  "bpm": 129,
+  "key": "G major",
+  "duration": 219.56,
+  "stems": {
+    "vocals": "data\\htdemucs\\Summer\\vocals.mp3",
+    "drums": "data\\htdemucs\\Summer\\drums.mp3",
+    "bass": "data\\htdemucs\\Summer\\bass.mp3",
+    "other": "data\\htdemucs\\Summer\\other.mp3"
+  }
+}
